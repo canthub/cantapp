@@ -16,6 +16,7 @@ import { buildReport, reportXlsx, reportCsv, reportPrintPage, emailReport, fileB
 import { importMembers, importEventsTable, importIcs, fetchIcs } from '../services/importers.js';
 import { sendMail, emailLayout } from '../services/mailer.js';
 import { sendPushToMember } from '../services/push.js';
+import { memberDistances, kickGeocoding } from '../services/geo.js';
 
 export const adminRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -171,6 +172,16 @@ adminRouter.post('/events/:id/send-report', async (req, res) => {
   res.json(await emailReport(id, recipients));
 });
 
+// ---------------------------------------------------------------- Távolságok
+
+// A tagok lakóhelyének távolsága az esemény helyszínétől – a meghívottak kijelöléséhez.
+adminRouter.post('/geo/distances', async (req, res) => {
+  const { address, city, country } = req.body || {};
+  const result = await memberDistances({ address, city, country });
+  const withoutLocation = getDb().prepare(`SELECT COUNT(*) AS n FROM members WHERE active = 1 AND home_lat IS NULL`).get().n;
+  res.json({ ...result, withoutLocation });
+});
+
 // ---------------------------------------------------------------- Tagok
 
 adminRouter.get('/members', (_req, res) => {
@@ -182,6 +193,7 @@ adminRouter.post('/members', (req, res) => {
     throw new ValidationError('Ezzel az e-mail-címmel már van tag.');
   }
   const { id } = saveMember(req.body);
+  kickGeocoding();
   res.status(201).json({ member: getMember(id) });
 });
 
@@ -189,6 +201,7 @@ adminRouter.put('/members/:id', (req, res) => {
   const id = Number(req.params.id);
   if (id === req.member.id && !req.body.isAdmin) throw new ValidationError('A saját admin jogosultságodat nem veheted el.');
   saveMember(req.body, id);
+  kickGeocoding();
   res.json({ member: getMember(id) });
 });
 
@@ -208,7 +221,9 @@ const requireFile = (req) => {
 
 adminRouter.post('/import/members', upload.single('file'), async (req, res) => {
   const file = requireFile(req);
-  res.json(await importMembers(file.buffer, file.originalname, { deactivateMissing: req.body.deactivateMissing === 'true' }));
+  const result = await importMembers(file.buffer, file.originalname, { deactivateMissing: req.body.deactivateMissing === 'true' });
+  kickGeocoding();
+  res.json(result);
 });
 
 adminRouter.post('/import/events', upload.single('file'), async (req, res) => {

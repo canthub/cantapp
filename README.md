@@ -20,6 +20,9 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 - Az eseményt a kórus minden tagja látja, de értesítést, emlékeztetőt csak a meghívottak kapnak, és csak ők jelezhetnek vissza. A riportban is csak ők szerepelnek.
 - Aki közzététel után kikerül a meghívottak közül, ezt az üzenetet kapja (appban, push-ként és e-mailben): *„Kedves Kórustag!, A megbeszéltek szerint most erre az eseményre mégsem kell jönnöd!”*. A visszajelzése törlődik. Akit közzététel után vesznek fel a listára, megkapja az eseményről szóló értesítést.
 - A koncert–főpróba szabály csak azokra vonatkozik, akik a főpróbára is meg vannak hívva.
+- **Közel lakók előre:** ha a tagoknál meg van adva az irányítószám és a lakóhely (település), a meghívottak kijelölésekor a szólamokon belül azok kerülnek előre, akik az esemény helyszínéhez (cím + város) légvonalban a legközelebb laknak. A nevük mellett a távolság is látszik (pl. „~5 km”). Akinél nincs lakóhely megadva, az a szólam végére kerül.
+  - A koordinátákat az app az **OpenStreetMap** ingyenes szolgáltatásával keresi meg a háttérben. Ehhez csak az irányítószám és a település kerül át, pontos utcacímet nem kérünk és nem küldünk. A találatokat eltárolja, így minden településre csak egyszer kérdez rá. A szolgáltatás szabályai szerint másodpercenként legfeljebb egy keresést indít, ezért egy nagy tagimport után a koordináták néhány perc alatt töltődnek fel.
+  - Kikapcsolható a `GEOCODING=off` beállítással.
 
 **Automatikus értesítések** (az appban, push értesítésként a telefonon és e-mailben):
 
@@ -43,7 +46,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 ## Import sablonok
 
 A `templates/` mappában (és az admin felületen letölthetően):
-- `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Admin (igen/nem).
+- `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Irányítószám, Lakóhely (település), Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Admin (igen/nem).
 - `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Kezdés, Befejezés, Típus, Énekkar, Turné, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
 
 Az Excel-sablonok második munkalapján kitöltési útmutató található.
@@ -89,7 +92,7 @@ E-mailt mindenki kap a push értesítésektől függetlenül.
 
 ```bash
 npm install
-npm run seed       # demóadatok (admin@example.com, tag1…tag8@example.com)
+npm run seed       # demóadatok (admin@example.com, tag1…tag10@example.com)
 npm run dev        # szerver: http://localhost:3000 (API)
 npm run dev:client # felület: http://localhost:5173
 npm test           # automatikus tesztek

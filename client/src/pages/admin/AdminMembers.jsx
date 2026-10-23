@@ -5,7 +5,7 @@ import { TopBar, Spinner, Empty, Modal, useLoad } from '../../components/ui.jsx'
 import { choirNames } from '../../util.js';
 import { AdminNav } from './AdminEvents.jsx';
 
-const EMPTY = { lastName: '', firstName: '', email: '', phone: '', voicePart: '', choirs: [], isAdmin: false, active: true };
+const EMPTY = { lastName: '', firstName: '', email: '', phone: '', voicePart: '', postalCode: '', homeCity: '', choirs: [], isAdmin: false, active: true };
 
 function MemberModal({ member, me, onClose }) {
   const [form, setForm] = useState(member || EMPTY);
@@ -51,6 +51,11 @@ function MemberModal({ member, me, onClose }) {
           <label className="field"><span>Telefon</span><input type="tel" value={form.phone} onChange={set('phone')} /></label>
           <label className="field"><span>Szólam</span><input type="text" value={form.voicePart} onChange={set('voicePart')} placeholder="pl. Szoprán 1" /></label>
         </div>
+        <div className="grid2" style={{ gridTemplateColumns: '1fr 2fr' }}>
+          <label className="field"><span>Irányítószám</span><input type="text" inputMode="numeric" value={form.postalCode} onChange={set('postalCode')} placeholder="4400" /></label>
+          <label className="field"><span>Lakóhely (település)</span><input type="text" value={form.homeCity} onChange={set('homeCity')} placeholder="Nyíregyháza" /></label>
+        </div>
+        <p className="hint" style={{ marginTop: -6 }}>Ebből számoljuk, ki lakik közel egy esemény helyszínéhez. Pontos utcacím nem kell.</p>
         {Object.entries(CHOIRS).map(([k, v]) => (
           <label key={k} className="check"><input type="checkbox" checked={form.choirs.includes(k)} onChange={() => toggleChoir(k)} />{v}</label>
         ))}
@@ -133,6 +138,7 @@ export default function AdminMembers({ me }) {
               <div><b>{m.name}</b>{m.isAdmin && <span className="badge t-koncert" style={{ marginLeft: 6 }}>Admin</span>}{!m.active && <span className="badge draft" style={{ marginLeft: 6 }}>Inaktív</span>}</div>
               <div className="small muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{[m.voicePart, choirNames(m.choirs)].filter(Boolean).join(' · ')}</div>
               <div className="small muted">{m.email}</div>
+              {(m.postalCode || m.homeCity) && <div className="small muted">📍 {[m.postalCode, m.homeCity].filter(Boolean).join(' ')}</div>}
             </div>
           </div>
         ))}

@@ -4,6 +4,7 @@ import { getEvent, eligibleMembers, responsesByMember } from '../models.js';
 import { notifyMembers, logReminder } from './notify.js';
 import { announceMessage, reminderMessage, missedEventMessage } from './messages.js';
 import { emailReport } from './report.js';
+import { kickGeocoding } from './geo.js';
 import { toLocal, nowLocal, calendarDaysBetween } from './time.js';
 
 const AUTO_KINDS = ['announce', 'weekly', 'daily'];
@@ -131,7 +132,11 @@ export async function runScheduler(now = new Date()) {
 }
 
 export function startScheduler() {
-  const tick = () => runScheduler().catch((err) => console.error('Ütemező hiba:', err));
+  const tick = () => {
+    runScheduler().catch((err) => console.error('Ütemező hiba:', err));
+    // A még nem megtalált lakóhelyeket (pl. hálózati hiba után) újra próbáljuk.
+    kickGeocoding();
+  };
   setTimeout(tick, 5000);
   return setInterval(tick, config.schedulerIntervalMs);
 }

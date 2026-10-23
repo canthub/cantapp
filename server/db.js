@@ -139,6 +139,18 @@ const MIGRATIONS = [
     member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
     PRIMARY KEY (event_id, member_id)
   );`,
+  // Lakóhely (irányítószám + település) és a hozzá tartozó koordináta – a helyszínhez közel lakók előresorolásához.
+  `ALTER TABLE members ADD COLUMN postal_code TEXT NOT NULL DEFAULT '';
+  ALTER TABLE members ADD COLUMN home_city TEXT NOT NULL DEFAULT '';
+  ALTER TABLE members ADD COLUMN home_lat REAL;
+  ALTER TABLE members ADD COLUMN home_lng REAL;
+  ALTER TABLE members ADD COLUMN geo_key TEXT;
+  CREATE TABLE geocode_cache (
+    query TEXT PRIMARY KEY,
+    lat REAL,
+    lng REAL,
+    created_at TEXT NOT NULL
+  );`,
 ];
 
 export function openDb(file) {

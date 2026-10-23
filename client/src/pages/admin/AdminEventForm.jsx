@@ -25,6 +25,7 @@ export default function AdminEventForm({ id }) {
   const [members, setMembers] = useState([]);
   const [invitedBefore, setInvitedBefore] = useState([]);
   const [copyFrom, setCopyFrom] = useState('');
+  const [geo, setGeo] = useState(null);
   const [notifyChange, setNotifyChange] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -53,6 +54,17 @@ export default function AdminEventForm({ id }) {
   useEffect(() => {
     if (form?.date && !deadlineTouched) setForm((f) => ({ ...f, deadlineDate: minusDays(f.date, 7) }));
   }, [form?.date, deadlineTouched]);
+
+  // Meghívottak kijelölésekor a tagok távolsága a helyszíntől (a gépelés után kis késleltetéssel).
+  useEffect(() => {
+    if (!form || form.inviteMode !== 'selected') return undefined;
+    const t = setTimeout(() => {
+      api('/admin/geo/distances', { method: 'POST', body: { address: form.address, city: form.city, country: form.country } })
+        .then(setGeo)
+        .catch(() => setGeo(null));
+    }, 700);
+    return () => clearTimeout(t);
+  }, [form?.inviteMode, form?.address, form?.city, form?.country]);
 
   // Koncertnél a legközelebbi főpróba ajánlása.
   useEffect(() => {
@@ -157,7 +169,10 @@ export default function AdminEventForm({ id }) {
                   </select>
                 </label>
               )}
-              <InvitePicker members={choirMembers} value={invitedNow} onChange={(ids) => setForm((f) => ({ ...f, invitees: ids }))} />
+              {geo?.located && <p className="hint">A szólamokon belül elöl azok, akik a helyszínhez legközelebb laknak (légvonalban).{geo.withoutLocation > 0 && ` ${geo.withoutLocation} tagnál nincs megadva lakóhely – ők a szólam végén vannak.`}</p>}
+              {geo && !geo.located && (form.address || form.city) && <p className="hint">A helyszínt nem találtuk a térképen, ezért név szerint rendezünk. Ellenőrizd a címet és a várost!</p>}
+              {!form.address && !form.city && <p className="hint">Add meg a helyszín címét vagy városát, és a közel lakók kerülnek előre.</p>}
+              <InvitePicker members={choirMembers} value={invitedNow} distances={geo?.located ? geo.distances : null} onChange={(ids) => setForm((f) => ({ ...f, invitees: ids }))} />
             </div>
           )}
           {removedNames.length > 0 && (

@@ -15,12 +15,15 @@ if (getDb().prepare('SELECT COUNT(*) AS n FROM events').get().n > 0) {
 const day = (n) => DateTime.now().setZone('Europe/Budapest').plus({ days: n }).toISODate();
 const admin = saveMember({ lastName: 'Admin', firstName: 'Demó', email: 'admin@example.com', voicePart: 'Tenor 1', choirs: ['cantemus', 'promusica'], isAdmin: true }).id;
 const names = [
-  ['Kovács', 'Anna', 'Szoprán 1', ['cantemus']], ['Nagy', 'Péter', 'Basszus 2', ['cantemus', 'promusica']],
-  ['Szabó', 'Eszter', 'Alt 1', ['promusica']], ['Tóth', 'Gábor', 'Tenor 2', ['cantemus']],
-  ['Varga', 'Júlia', 'Szoprán 2', ['cantemus', 'promusica']], ['Kiss', 'Bence', 'Basszus 1', ['promusica']],
-  ['Molnár', 'Réka', 'Alt 2', ['cantemus']], ['Horváth', 'Dávid', 'Tenor 1', ['promusica']],
+  ['Kovács', 'Anna', 'Szoprán 1', ['cantemus'], '4400', 'Nyíregyháza'], ['Nagy', 'Péter', 'Basszus 2', ['cantemus', 'promusica'], '4300', 'Nyírbátor'],
+  ['Szabó', 'Eszter', 'Alt 1', ['promusica'], '4024', 'Debrecen'], ['Tóth', 'Gábor', 'Tenor 2', ['cantemus'], '4400', 'Nyíregyháza'],
+  ['Varga', 'Júlia', 'Szoprán 2', ['cantemus', 'promusica'], '4600', 'Kisvárda'], ['Kiss', 'Bence', 'Basszus 1', ['promusica'], '4400', 'Nyíregyháza'],
+  ['Molnár', 'Réka', 'Alt 2', ['cantemus'], '', ''], ['Horváth', 'Dávid', 'Tenor 1', ['promusica'], '4431', 'Nyíregyháza'],
+  ['Fekete', 'Lilla', 'Szoprán 1', ['cantemus'], '4600', 'Kisvárda'], ['Balogh', 'Zsófia', 'Szoprán 1', ['cantemus'], '4431', 'Nyíregyháza'],
 ];
-const ids = names.map(([last, first, voice, choirs], i) => saveMember({ lastName: last, firstName: first, email: `tag${i + 1}@example.com`, voicePart: voice, choirs }).id);
+const ids = names.map(([last, first, voice, choirs, postalCode, homeCity], i) => saveMember({
+  lastName: last, firstName: first, email: `tag${i + 1}@example.com`, voicePart: voice, choirs, postalCode, homeCity,
+}).id);
 
 const place = { country: 'Magyarország', city: 'Nyíregyháza', address: 'Példa utca 1.', venue: 'Kórusterem' };
 const hall = { country: 'Magyarország', city: 'Nyíregyháza', address: 'Példa tér 2.', venue: 'Hangversenyterem' };
@@ -43,4 +46,4 @@ await setResponse(dr, ids[0], 'yes');
 await setResponse(c, ids[0], 'yes');
 await setResponse(dr, ids[4], 'no');
 await setResponse(dr, ids[1], 'yes');
-console.log(`Demóadatok betöltve. Admin belépés: admin@example.com (tagok: tag1…tag8@example.com) – admin id: ${admin}`);
+console.log(`Demóadatok betöltve. Admin belépés: admin@example.com (tagok: tag1…tag10@example.com) – admin id: ${admin}`);

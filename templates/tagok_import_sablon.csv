@@ -1,4 +1,4 @@
-﻿Vezetéknév;Keresztnév;E-mail;Telefon;Szólam;Cantemus Vegyeskar;Pro Musica;Admin
-Kovács;Anna;kovacs.anna@example.com;+36 30 123 4567;Szoprán 1;igen;nem;nem
-Nagy;Péter;nagy.peter@example.com;+36 20 765 4321;Basszus 2;igen;igen;nem
-Szabó;Eszter;szabo.eszter@example.com;;Alt 1;nem;igen;nem
+﻿Vezetéknév;Keresztnév;E-mail;Telefon;Szólam;Irányítószám;Lakóhely (település);Cantemus Vegyeskar;Pro Musica;Admin
+Kovács;Anna;kovacs.anna@example.com;+36 30 123 4567;Szoprán 1;4400;Nyíregyháza;igen;nem;nem
+Nagy;Péter;nagy.peter@example.com;+36 20 765 4321;Basszus 2;4300;Nyírbátor;igen;igen;nem
+Szabó;Eszter;szabo.eszter@example.com;;Alt 1;;;nem;igen;nem

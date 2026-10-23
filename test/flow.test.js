@@ -395,3 +395,61 @@ test('meghívottak: csak a kijelöltek kapnak értesítést, a kivett tag üzene
     server.close();
   }
 });
+
+test('közel lakók: lakóhely koordinátája a háttérben, gyorsítótárral, távolság a helyszíntől', async () => {
+  const { setGeocoder, geocodePendingMembers, memberDistances, distanceKm } = await import('../server/services/geo.js');
+  const places = {
+    nyiregyhaza: { lat: 47.9554, lng: 21.7167 },
+    nyirbator: { lat: 47.8353, lng: 22.1306 },
+    debrecen: { lat: 47.5316, lng: 21.6273 },
+  };
+  const calls = [];
+  setGeocoder(async (q) => {
+    calls.push(q);
+    const key = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    if (key.includes('nemletezik')) return null;
+    return Object.entries(places).find(([k]) => key.includes(k))?.[1] ?? null;
+  });
+  try {
+    // Nagyjából stimmel: Nyíregyháza–Debrecen ~47 km légvonalban.
+    assert.ok(Math.abs(distanceKm(places.nyiregyhaza, places.debrecen) - 47) < 3);
+
+    const mk = (first, postalCode, homeCity) => saveMember({
+      lastName: 'Lakó', firstName: first, email: `${first.toLowerCase()}@lako.hu`, voicePart: 'Alt 1', postalCode, homeCity, choirs: ['promusica'],
+    }).id;
+    const near = mk('Közeli', '4400', 'Nyíregyháza');
+    const mid = mk('Középső', '4300', 'Nyírbátor');
+    const far = mk('Távoli', '4024', 'Debrecen');
+    const nowhere = mk('Ismeretlen', '9999', 'Nemletezik');
+    const noHome = mk('Lakóhelynélküli', '', '');
+
+    await geocodePendingMembers();
+    const lookups = calls.length;
+    await geocodePendingMembers();
+    assert.equal(calls.length, lookups, 'második futáskor nincs újabb keresés');
+
+    const { located, distances } = await memberDistances({ address: 'Példa tér 2.', city: 'Nyíregyháza', country: 'Magyarország' });
+    assert.equal(located, true);
+    assert.ok(distances[near] < 1);
+    assert.ok(distances[mid] > 25 && distances[mid] < 40);
+    assert.ok(distances[far] > 40);
+    assert.ok(!(nowhere in distances) && !(noHome in distances), 'ismeretlen lakóhelynél nincs távolság');
+
+    // Ugyanaz a település egy másik tagnál már a gyorsítótárból jön.
+    const before = calls.length;
+    mk('Szomszéd', '4400', 'Nyíregyháza');
+    await geocodePendingMembers();
+    assert.equal(calls.length, before);
+
+    // Költözés: új koordináta.
+    saveMember({ lastName: 'Lakó', firstName: 'Távoli', email: 'távoli@lako.hu'.normalize(), voicePart: 'Alt 1', postalCode: '4400', homeCity: 'Nyíregyháza', choirs: ['promusica'] }, far);
+    await geocodePendingMembers();
+    const after = await memberDistances({ city: 'Nyíregyháza', country: 'Magyarország' });
+    assert.ok(after.distances[far] < 1);
+
+    // Csak országgal nincs helyszín.
+    assert.equal((await memberDistances({ country: 'Magyarország' })).located, false);
+  } finally {
+    setGeocoder(null);
+  }
+});

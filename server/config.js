@@ -37,6 +37,12 @@ export const config = {
   // Ha egy eseménynél nincs megadva határidő, ennyi nappal az esemény előtt lesz.
   defaultDeadlineDays: Number(process.env.DEFAULT_DEADLINE_DAYS || 7),
   schedulerIntervalMs: Number(process.env.SCHEDULER_INTERVAL_MS || 5 * 60 * 1000),
+  // Címből koordináta (OpenStreetMap Nominatim). GEOCODING=off kikapcsolja.
+  geocoding: {
+    enabled: process.env.GEOCODING !== 'off' && process.env.NODE_ENV !== 'test',
+    url: process.env.GEOCODER_URL || 'https://nominatim.openstreetmap.org/search',
+    contact: process.env.GEOCODER_CONTACT || 'support@cantemus.hu',
+  },
 };
 
 export const emailEnabled = () => Boolean(config.smtp.host);

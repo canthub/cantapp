@@ -30,6 +30,9 @@ export function serializeMember(row) {
     email: row.email,
     phone: row.phone,
     voicePart: row.voice_part,
+    postalCode: row.postal_code,
+    homeCity: row.home_city,
+    hasLocation: row.home_lat != null,
     isAdmin: Boolean(row.is_admin),
     active: Boolean(row.active),
     choirs: choirsOfMember(row.id),
@@ -64,6 +67,8 @@ export function normalizeMemberInput(input) {
     email: str(input.email).toLowerCase(),
     phone: str(input.phone),
     voicePart: str(input.voicePart),
+    postalCode: str(input.postalCode),
+    homeCity: str(input.homeCity),
     isAdmin: Boolean(input.isAdmin),
     active: input.active === undefined ? true : Boolean(input.active),
     choirs: [...new Set((input.choirs || []).filter((c) => c in CHOIRS))],
@@ -72,6 +77,11 @@ export function normalizeMemberInput(input) {
   if (!m.lastName && !m.firstName) throw new ValidationError('A név megadása kötelező.');
   if (m.choirs.length === 0 && !m.isAdmin) throw new ValidationError('Legalább egy énekkart meg kell adni.');
   return m;
+}
+
+// A lakóhely kereséséhez használt szöveg (irányítószám + település); üres, ha nincs megadva.
+export function memberGeoKey({ postalCode, homeCity }) {
+  return [postalCode, homeCity].map((s) => str(s)).filter(Boolean).join(' ');
 }
 
 // Létrehoz vagy (e-mail alapján) frissít egy tagot. Visszaadja: { id, created }.
@@ -88,11 +98,13 @@ export function saveMember(input, id = null) {
     let memberId;
     if (existing) {
       memberId = existing.id;
-      db.prepare(`UPDATE members SET last_name=?, first_name=?, email=?, phone=?, voice_part=?, is_admin=?, active=?, updated_at=? WHERE id=?`)
-        .run(m.lastName, m.firstName, m.email, m.phone, m.voicePart, m.isAdmin ? 1 : 0, m.active ? 1 : 0, nowIso(), memberId);
+      db.prepare(`UPDATE members SET last_name=?, first_name=?, email=?, phone=?, voice_part=?, postal_code=?, home_city=?, is_admin=?, active=?, updated_at=? WHERE id=?`)
+        .run(m.lastName, m.firstName, m.email, m.phone, m.voicePart, m.postalCode, m.homeCity, m.isAdmin ? 1 : 0, m.active ? 1 : 0, nowIso(), memberId);
+      // Ha a lakóhely megváltozott, a régi koordináta már nem érvényes – a háttérben újra megkeressük.
+      db.prepare(`UPDATE members SET home_lat = NULL, home_lng = NULL, geo_key = NULL WHERE id = ? AND geo_key IS NOT ?`).run(memberId, memberGeoKey(m));
     } else {
-      memberId = Number(db.prepare(`INSERT INTO members (last_name, first_name, email, phone, voice_part, is_admin, active) VALUES (?,?,?,?,?,?,?)`)
-        .run(m.lastName, m.firstName, m.email, m.phone, m.voicePart, m.isAdmin ? 1 : 0, m.active ? 1 : 0).lastInsertRowid);
+      memberId = Number(db.prepare(`INSERT INTO members (last_name, first_name, email, phone, voice_part, postal_code, home_city, is_admin, active) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(m.lastName, m.firstName, m.email, m.phone, m.voicePart, m.postalCode, m.homeCity, m.isAdmin ? 1 : 0, m.active ? 1 : 0).lastInsertRowid);
     }
     db.prepare('DELETE FROM member_choirs WHERE member_id = ?').run(memberId);
     for (const c of m.choirs) db.prepare('INSERT INTO member_choirs (member_id, choir) VALUES (?, ?)').run(memberId, c);

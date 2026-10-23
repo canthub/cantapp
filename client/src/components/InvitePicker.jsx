@@ -3,8 +3,11 @@ import { compareVoices } from '../../../shared/constants.js';
 
 const NO_VOICE = 'Szólam nincs megadva';
 
+const formatKm = (km) => (km < 1 ? '<1 km' : `~${Math.round(km)} km`);
+
 // Meghívottak kijelölése szólamonként csoportosítva (S, A, T, B sorrendben), szólamonkénti „mind” jelölővel.
-export default function InvitePicker({ members, value, onChange }) {
+// Ha ismert a tagok távolsága a helyszíntől, a szólamon belül a közelebb lakók kerülnek előre.
+export default function InvitePicker({ members, value, onChange, distances = null }) {
   const [q, setQ] = useState('');
   const selected = useMemo(() => new Set(value), [value]);
 
@@ -15,9 +18,10 @@ export default function InvitePicker({ members, value, onChange }) {
       if (!map.has(v)) map.set(v, []);
       map.get(v).push(m);
     }
-    for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name, 'hu'));
+    const dist = (m) => distances?.[m.id] ?? Infinity;
+    for (const list of map.values()) list.sort((a, b) => dist(a) - dist(b) || a.name.localeCompare(b.name, 'hu'));
     return [...map.entries()].sort(([a], [b]) => (a === NO_VOICE) - (b === NO_VOICE) || compareVoices(a, b));
-  }, [members]);
+  }, [members, distances]);
 
   const needle = q.trim().toLowerCase();
   const set = (ids, on) => {
@@ -64,6 +68,7 @@ export default function InvitePicker({ members, value, onChange }) {
               <label key={m.id} className="check voice-member">
                 <input type="checkbox" checked={selected.has(m.id)} onChange={() => set([m.id], !selected.has(m.id))} />
                 {m.name}
+                {distances && <span className="muted small" style={{ marginLeft: 'auto' }}>{m.id in distances ? formatKm(distances[m.id]) : '–'}</span>}
               </label>
             ))}
           </div>

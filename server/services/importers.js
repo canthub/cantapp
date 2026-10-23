@@ -143,6 +143,8 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
           email,
           phone: String(pick(row, 'Telefon', 'Telefonszám', 'Mobil')),
           voicePart: String(pick(row, 'Szólam')),
+          postalCode: String(pick(row, 'Irányítószám', 'Irsz')),
+          homeCity: String(pick(row, 'Lakóhely (település)', 'Lakóhely', 'Település', 'Város')),
           isAdmin: parseBool(pick(row, 'Admin', 'Adminisztrátor')),
           choirs,
           active: true,
