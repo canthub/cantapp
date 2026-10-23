@@ -2,10 +2,14 @@ import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import ical from 'node-ical';
 import { DateTime } from 'luxon';
-import { createEvent, saveMember, setMemberActive, listMembers } from '../models.js';
+import {
+  createEvent, updateEvent, getEvent, findDuplicateEvent, normalizeEventInput, eligibleMembers, saveMember, setMemberActive, listMembers,
+} from '../models.js';
 import { getDb, tx } from '../db.js';
 import { TZ, defaultDeadlineDate } from './time.js';
 import { config } from '../config.js';
+import { notifyMembers } from './notify.js';
+import { changeMessage } from './messages.js';
 
 // ---------------------------------------------------------------- Táblázat beolvasása
 
@@ -112,7 +116,7 @@ export function parseEventType(v) {
 export async function importMembers(buffer, filename, { deactivateMissing = false } = {}) {
   const rows = await readTable(buffer, filename);
   const result = { created: 0, updated: 0, deactivated: 0, errors: [] };
-  const seen = new Set();
+  const seen = new Map(); // e-mail → sor száma
   tx(() => {
     rows.forEach((row, i) => {
       const line = i + 2;
@@ -129,6 +133,9 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
         if (parseBool(pick(row, 'Pro Musica', 'ProMusica'))) choirs.push('promusica');
         for (const c of parseChoirs(pick(row, 'Énekkar', 'Kórus', 'Énekkarok'))) if (!choirs.includes(c)) choirs.push(c);
         const email = String(pick(row, 'E-mail', 'Email', 'E-mail cím', 'Emailcím')).trim().toLowerCase();
+        if (email && seen.has(email)) {
+          throw new Error(`ez az e-mail-cím (${email}) már szerepel a táblázat ${seen.get(email)}. sorában – a sor kimaradt.`);
+        }
         const { created } = saveMember({
           lastName,
           firstName,
@@ -139,7 +146,7 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
           choirs,
           active: true,
         });
-        seen.add(email);
+        seen.set(email, line);
         result[created ? 'created' : 'updated']++;
       } catch (err) {
         result.errors.push(`${line}. sor: ${err.message}`);
@@ -159,11 +166,16 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
 
 // ---------------------------------------------------------------- Események importja (táblázat)
 
+const sameEvent = (a, b) => a.date === b.date && a.startTime === b.startTime
+  && a.name.toLowerCase().replace(/\s+/g, ' ') === b.name.toLowerCase().replace(/\s+/g, ' ')
+  && a.choirs.some((c) => b.choirs.includes(c));
+
 export async function importEventsTable(buffer, filename, { defaultChoirs = [], deadlineDaysBefore = config.defaultDeadlineDays } = {}) {
   const rows = await readTable(buffer, filename);
-  const result = { created: 0, skipped: 0, errors: [], ids: [] };
+  const result = { created: 0, skipped: 0, skippedItems: [], errors: [], ids: [] };
   // A sorrend számít: a főpróbák előbb kerüljenek be, hogy a koncertek hozzájuk kapcsolódhassanak.
   const parsed = rows.map((row, i) => ({ row, line: i + 2, type: parseEventType(pick(row, 'Típus', 'Esemény típusa')) }));
+  const inFile = []; // { e, line } – a fájlon belüli ismétlődések felismeréséhez
   parsed.sort((a, b) => (a.type === 'koncert') - (b.type === 'koncert'));
   tx(() => {
     for (const { row, line, type } of parsed) {
@@ -172,7 +184,7 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
         const choirsCell = pick(row, 'Énekkar', 'Kórus', 'Melyik énekkar');
         const choirs = choirsCell ? parseChoirs(choirsCell) : defaultChoirs;
         const deadlineCell = pick(row, 'Visszajelzési határidő', 'Határidő');
-        const id = createEvent({
+        const input = {
           name: pick(row, 'Esemény neve', 'Név', 'Esemény', 'Megnevezés'),
           type,
           date,
@@ -186,7 +198,22 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
           deadlineDate: deadlineCell ? parseDate(deadlineCell) : (date ? defaultDeadlineDate(parseDate(date), deadlineDaysBefore) : ''),
           notes: pick(row, 'Megjegyzés', 'Leírás'),
           choirs,
-        }, { source: 'import' });
+        };
+        const e = normalizeEventInput(input);
+        const label = `„${e.name}” (${e.date}${e.startTime ? ` ${e.startTime}` : ''})`;
+        const twin = inFile.find((x) => sameEvent(x.e, e));
+        if (twin) {
+          result.skipped++;
+          result.skippedItems.push(`${line}. sor: ${label} már szerepel a táblázat ${twin.line}. sorában – kihagyva.`);
+          continue;
+        }
+        inFile.push({ e, line });
+        if (findDuplicateEvent(e)) {
+          result.skipped++;
+          result.skippedItems.push(`${line}. sor: ${label} már létezik az appban – kihagyva.`);
+          continue;
+        }
+        const id = createEvent(input, { source: 'import' });
         result.created++;
         result.ids.push(id);
       } catch (err) {
@@ -194,6 +221,10 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
       }
     }
   });
+  // A koncertek feldolgozása a végére kerül, ezért az üzeneteket sorszám szerint rendezzük.
+  const byLine = (a, b) => parseInt(a, 10) - parseInt(b, 10);
+  result.skippedItems.sort(byLine);
+  result.errors.sort(byLine);
   return result;
 }
 
@@ -209,6 +240,53 @@ export async function fetchIcs(url) {
 
 const paramText = (v) => (v && typeof v === 'object' && 'val' in v ? String(v.val) : String(v ?? '')).trim();
 
+// Naptárból szinkronizált mezők. Újraimportáláskor csak az íródik felül, ami a naptárban változott
+// az előző import óta – így az appban kézzel pontosított adatok (pl. épület, típus, határidő) megmaradnak.
+const SYNC_FIELDS = ['name', 'date', 'startTime', 'endTime', 'address', 'notes'];
+
+// Stabil azonosító: egyszeri eseménynél a naptári UID, ismétlődőnél UID + az alkalom eredeti napja.
+// Így az áthelyezett (vagy időpontot váltó) alkalom a meglévő eseményt frissíti, nem újat hoz létre.
+function instanceUid(inst) {
+  if (!inst.isRecurring) return `ics:${inst.event.uid}`;
+  const original = inst.event.recurrenceid || inst.start;
+  return `ics:${inst.event.uid}:${DateTime.fromJSDate(new Date(original)).setZone(TZ).toISODate()}`;
+}
+
+function calendarValues(inst) {
+  const start = DateTime.fromJSDate(inst.start).setZone(TZ);
+  const end = inst.end ? DateTime.fromJSDate(inst.end).setZone(TZ) : null;
+  return {
+    name: paramText(inst.summary) || 'Névtelen esemény',
+    date: inst.isFullDay ? DateTime.fromJSDate(inst.start, { zone: 'utc' }).toISODate() : start.toISODate(),
+    startTime: inst.isFullDay ? '' : start.toFormat('HH:mm'),
+    endTime: inst.isFullDay || !end ? '' : end.toFormat('HH:mm'),
+    address: paramText(inst.event.location),
+    notes: paramText(inst.event.description).slice(0, 2000),
+  };
+}
+
+// Meglévő, naptárból importált esemény frissítése. Visszaadja a változott mezőket (üres tömb, ha nincs változás).
+function syncFromCalendar(row, cal) {
+  const current = getEvent(row.id);
+  const previous = row.external_data ? JSON.parse(row.external_data) : current;
+  const changes = {};
+  for (const f of SYNC_FIELDS) {
+    if (previous[f] !== cal[f] && current[f] !== cal[f]) changes[f] = cal[f];
+  }
+  getDb().prepare('UPDATE events SET external_data = ? WHERE id = ?').run(JSON.stringify(cal), row.id);
+  if (Object.keys(changes).length === 0) return { changed: [] };
+  const input = { ...current, ...changes };
+  // Ha az esemény napja eltolódott, a határidő is ugyanannyival tolódik.
+  if (changes.date) {
+    const shift = DateTime.fromISO(changes.date).diff(DateTime.fromISO(current.date), 'days').days;
+    input.deadlineDate = DateTime.fromISO(current.deadlineDate).plus({ days: shift }).toISODate();
+  }
+  const { importantChange } = updateEvent(row.id, input);
+  return { changed: Object.keys(changes), importantChange };
+}
+
+const FIELD_LABELS = { name: 'név', date: 'dátum', startTime: 'kezdés', endTime: 'befejezés', address: 'helyszín', notes: 'leírás' };
+
 export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = config.defaultDeadlineDays, defaultType = 'proba' }) {
   if (!choirs?.length) throw Object.assign(new Error('Válaszd ki, melyik énekkar eseményei ezek!'), { status: 400 });
   let data;
@@ -219,8 +297,9 @@ export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = c
   }
   const fromDate = from ? DateTime.fromISO(from, { zone: TZ }).startOf('day').toJSDate() : new Date();
   const toDate = to ? DateTime.fromISO(to, { zone: TZ }).endOf('day').toJSDate() : DateTime.now().plus({ months: 12 }).toJSDate();
-  const result = { created: 0, skipped: 0, errors: [], ids: [] };
-  const existsStmt = getDb().prepare('SELECT 1 FROM events WHERE external_uid = ?');
+  const result = { created: 0, updated: 0, skipped: 0, notified: 0, updatedItems: [], skippedItems: [], errors: [], ids: [] };
+  const byUid = getDb().prepare('SELECT * FROM events WHERE external_uid = ?');
+  const toNotify = [];
 
   const instances = [];
   for (const item of Object.values(data)) {
@@ -233,34 +312,49 @@ export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = c
 
   tx(() => {
     for (const inst of instances) {
-      const name = paramText(inst.summary) || 'Névtelen esemény';
-      const start = DateTime.fromJSDate(inst.start).setZone(TZ);
-      const end = inst.end ? DateTime.fromJSDate(inst.end).setZone(TZ) : null;
-      const uid = `ics:${inst.event.uid}:${start.toUTC().toISO()}`;
-      if (existsStmt.get(uid)) {
-        result.skipped++;
-        continue;
-      }
+      const cal = calendarValues(inst);
+      const uid = instanceUid(inst);
+      const label = `„${cal.name}” (${cal.date}${cal.startTime ? ` ${cal.startTime}` : ''})`;
       try {
-        const date = inst.isFullDay ? DateTime.fromJSDate(inst.start, { zone: 'utc' }).toISODate() : start.toISODate();
+        const existing = byUid.get(uid);
+        if (existing) {
+          const { changed, importantChange } = syncFromCalendar(existing, cal);
+          if (changed.length === 0) {
+            result.skipped++;
+            continue;
+          }
+          result.updated++;
+          result.updatedItems.push(`${label}: módosult (${changed.map((f) => FIELD_LABELS[f]).join(', ')})`);
+          if (importantChange && existing.status === 'published') toNotify.push(existing.id);
+          continue;
+        }
+        // Kézzel vagy táblázatból már felvett ugyanilyen esemény: nem duplikáljuk, hanem összekötjük a naptárral.
+        const twin = findDuplicateEvent({ ...cal, choirs });
+        if (twin) {
+          if (!twin.external_uid) getDb().prepare('UPDATE events SET external_uid = ?, external_data = ? WHERE id = ?').run(uid, JSON.stringify(cal), twin.id);
+          result.skipped++;
+          result.skippedItems.push(`${label} már létezik az appban – kihagyva.`);
+          continue;
+        }
         const id = createEvent({
-          name,
-          type: parseEventType(name) || defaultType,
-          date,
-          startTime: inst.isFullDay ? '' : start.toFormat('HH:mm'),
-          endTime: inst.isFullDay || !end ? '' : end.toFormat('HH:mm'),
-          address: paramText(inst.event.location),
-          isTour: /turn[eé]/i.test(name),
-          deadlineDate: defaultDeadlineDate(date, deadlineDaysBefore),
-          notes: paramText(inst.event.description).slice(0, 2000),
+          ...cal,
+          type: parseEventType(cal.name) || defaultType,
+          isTour: /turn[eé]/i.test(cal.name),
+          deadlineDate: defaultDeadlineDate(cal.date, deadlineDaysBefore),
           choirs,
-        }, { source: 'ics', externalUid: uid });
+        }, { source: 'ics', externalUid: uid, externalData: cal });
         result.created++;
         result.ids.push(id);
       } catch (err) {
-        result.errors.push(`${name}: ${err.message}`);
+        result.errors.push(`${label}: ${err.message}`);
       }
     }
   });
+
+  // A már közzétett események időpont- vagy helyszínváltozásáról a tagok értesítést kapnak.
+  for (const id of toNotify) {
+    const ev = getEvent(id);
+    result.notified += await notifyMembers(eligibleMembers(id).map((m) => m.id), { ...changeMessage(ev), eventId: id });
+  }
   return result;
 }

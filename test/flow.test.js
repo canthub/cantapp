@@ -56,8 +56,8 @@ test('teljes folyamat: közzététel, visszajelzés, főpróba-szabály, emléke
   const base = {
     country: 'Magyarország', city: 'Nyíregyháza', address: 'Példa tér 2.', venue: 'Hangversenyterem', choirs: ['cantemus'],
   };
-  const drId = createEvent({ ...base, name: 'Adventi koncert főpróba', type: 'foproba', date: '2026-12-05', startTime: '15:00', deadlineDate: '2026-11-25' });
-  const concertId = createEvent({ ...base, name: 'Adventi koncert', type: 'koncert', date: '2026-12-06', startTime: '19:00', deadlineDate: '2026-11-25' });
+  const drId = createEvent({ ...base, name: 'Adventi koncert főpróba', type: 'foproba', date: '2026-12-12', startTime: '15:00', deadlineDate: '2026-11-25' });
+  const concertId = createEvent({ ...base, name: 'Adventi koncert', type: 'koncert', date: '2026-12-13', startTime: '19:00', deadlineDate: '2026-11-25' });
   assert.equal(getEventRow(concertId).dress_rehearsal_id, drId, 'a koncert automatikusan a főpróbához kapcsolódik');
   const pmId = createEvent({ ...base, choirs: ['promusica'], name: 'Pro Musica próba', type: 'proba', date: '2026-11-23', startTime: '17:00', deadlineDate: '2026-11-21' });
 
@@ -188,4 +188,78 @@ test('Google Naptár (.ics) import ismétlődő próbával', async () => {
   const again = await importIcs(ics, opts);
   assert.equal(again.created, 0);
   assert.equal(again.skipped, 5);
+});
+
+test('duplikáció-védelem: ugyanaz az eseménytáblázat kétszer', async () => {
+  const file = fs.readFileSync('templates/esemenyek_import_sablon.csv');
+  const again = await importEventsTable(file, 'esemenyek.csv');
+  assert.equal(again.created, 0);
+  assert.equal(again.skipped, 4);
+  assert.match(again.skippedItems[0], /már létezik az appban – kihagyva/);
+
+  // Fájlon belüli ismétlődés (más kis-/nagybetűvel, szóközökkel) – csak az első sor jön létre.
+  const csv = 'Esemény neve;Dátum;Kezdés;Típus;Énekkar\nÚjévi  próba;2027-01-05;18:00;próba;Pro Musica\nújévi próba;2027-01-05;18:00;próba;mindkettő\n';
+  const r = await importEventsTable(Buffer.from(csv), 'x.csv');
+  assert.equal(r.created, 1);
+  assert.equal(r.skipped, 1);
+  assert.match(r.skippedItems[0], /3\. sor: „újévi próba” \(2027-01-05 18:00\) már szerepel a táblázat 2\. sorában/);
+
+  // Más kórus ugyanazzal a névvel/időponttal nem duplikátum.
+  const other = await importEventsTable(Buffer.from('Esemény neve;Dátum;Kezdés;Típus;Énekkar\nÚjévi próba;2027-01-05;18:00;próba;Cantemus\n'), 'y.csv');
+  assert.equal(other.created, 1, 'a Pro Musica-s eseménnyel nincs közös kórus, ezért ez nem duplikátum');
+});
+
+test('duplikáció-védelem: ismétlődő e-mail a tagtáblázaton belül', async () => {
+  const csv = 'Vezetéknév;Keresztnév;E-mail;Cantemus Vegyeskar;Pro Musica\nDupla;Dóra;dupla@example.com;igen;nem\nDupla;Dóri;DUPLA@example.com;nem;igen\n';
+  const r = await importMembers(Buffer.from(csv), 'tagok.csv', { deactivateMissing: true });
+  assert.equal(r.created, 1);
+  assert.equal(r.updated, 0);
+  assert.deepEqual(r.errors, ['3. sor: ez az e-mail-cím (dupla@example.com) már szerepel a táblázat 2. sorában – a sor kimaradt.']);
+  assert.equal(r.deactivated, 0, 'hibás táblázatnál nem inaktiválunk senkit');
+  const row = getDb().prepare(`SELECT first_name FROM members WHERE email = 'dupla@example.com'`).get();
+  assert.equal(row.first_name, 'Dóra', 'az első sor marad érvényben');
+});
+
+test('naptár újraimportálás: áthelyezett alkalom frissül, a tagok értesítést kapnak', async () => {
+  const cal = (moved, location = 'Kórusterem') => [
+    'BEGIN:VCALENDAR', 'VERSION:2.0',
+    'BEGIN:VEVENT', 'UID:szinkron@google.com', 'DTSTART;TZID=Europe/Budapest:20270202T180000', 'DTEND;TZID=Europe/Budapest:20270202T200000',
+    'RRULE:FREQ=WEEKLY;COUNT=3', 'SUMMARY:Szinkron próba', `LOCATION:${location}`, 'END:VEVENT',
+    ...(moved ? ['BEGIN:VEVENT', 'UID:szinkron@google.com', 'RECURRENCE-ID;TZID=Europe/Budapest:20270209T180000',
+      'DTSTART;TZID=Europe/Budapest:20270210T170000', 'DTEND;TZID=Europe/Budapest:20270210T190000', 'SUMMARY:Szinkron próba', `LOCATION:${location}`, 'END:VEVENT'] : []),
+    'BEGIN:VEVENT', 'UID:egyszeri@google.com', 'DTSTART;TZID=Europe/Budapest:20270220T190000', 'SUMMARY:Farsangi koncert', 'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const opts = { choirs: ['cantemus'], from: '2027-02-01', to: '2027-03-31' };
+  const first = await importIcs(cal(false), opts);
+  assert.equal(first.created, 4);
+  const [, secondId] = first.ids;
+  setEventStatus(secondId, 'published');
+  // Az admin közben pontosította az épületet és a határidőt – ezek nem íródhatnak felül.
+  getDb().prepare(`UPDATE events SET venue = 'Zeneiskola' WHERE id = ?`).run(secondId);
+
+  const before = getEventRow(secondId);
+  const second = await importIcs(cal(true), opts);
+  assert.equal(second.created, 0, 'nem jön létre új esemény az áthelyezett alkalomhoz');
+  assert.equal(second.updated, 1);
+  assert.equal(second.skipped, 3);
+  assert.match(second.updatedItems[0], /módosult \(dátum, kezdés, befejezés\)/);
+  const after = getEventRow(secondId);
+  assert.equal(`${after.date} ${after.start_time}`, '2027-02-10 17:00');
+  assert.equal(after.venue, 'Zeneiskola');
+  assert.equal(new Date(after.deadline_at) - new Date(before.deadline_at), 86400000, 'a határidő is egy nappal tolódott');
+  assert.ok(second.notified > 0, 'a közzétett esemény tagjai értesítést kapnak');
+  assert.ok(getDb().prepare(`SELECT 1 FROM notifications WHERE event_id = ? AND kind = 'change'`).get(secondId));
+
+  // Harmadszorra semmi nem változik.
+  const third = await importIcs(cal(true), opts);
+  assert.deepEqual([third.created, third.updated, third.skipped], [0, 0, 4]);
+
+  // Kézzel felvett esemény + ugyanaz a naptárban → nem duplikálódik, hanem összekapcsolódik.
+  createEvent({ name: 'Húsvéti koncert', type: 'koncert', date: '2027-03-28', startTime: '18:00', choirs: ['cantemus'] });
+  const easter = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:husvet@google.com', 'DTSTART;TZID=Europe/Budapest:20270328T180000',
+    'SUMMARY:húsvéti koncert', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const e1 = await importIcs(easter, opts);
+  assert.deepEqual([e1.created, e1.skipped], [0, 1]);
+  assert.ok(getDb().prepare(`SELECT 1 FROM events WHERE external_uid = 'ics:husvet@google.com'`).get());
 });

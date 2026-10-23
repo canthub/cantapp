@@ -17,8 +17,18 @@ function Result({ result }) {
   if (!result) return null;
   return (
     <div className={`notice ${result.errors.length ? 'warn' : 'ok'}`}>
-      ✔ Létrehozva: <b>{result.created}</b> esemény (piszkozatként){result.skipped ? <> · Már korábban importálva: <b>{result.skipped}</b></> : null}
-      {result.errors.length > 0 && <><div style={{ marginTop: 6 }}>Kimaradt sorok:</div><ul className="result-list">{result.errors.map((e) => <li key={e}>{e}</li>)}</ul></>}
+      ✔ Létrehozva: <b>{result.created}</b> esemény (piszkozatként)
+      {result.updated ? <> · Frissítve: <b>{result.updated}</b></> : null}
+      {result.skipped ? <> · Kihagyva, mert már létezik: <b>{result.skipped}</b></> : null}
+      {result.notified ? <div style={{ marginTop: 6 }}>A módosult, már közzétett eseményekről {result.notified} értesítés ment ki a tagoknak.</div> : null}
+      {result.updatedItems?.length > 0 && <><div style={{ marginTop: 6 }}>A naptárban módosult események:</div><ul className="result-list">{result.updatedItems.map((e) => <li key={e}>{e}</li>)}</ul></>}
+      {result.skippedItems?.length > 0 && (
+        <details style={{ marginTop: 6 }}>
+          <summary>Kihagyott sorok ({result.skippedItems.length})</summary>
+          <ul className="result-list">{result.skippedItems.map((e) => <li key={e}>{e}</li>)}</ul>
+        </details>
+      )}
+      {result.errors.length > 0 && <><div style={{ marginTop: 6 }}>Hibás sorok (ezek kimaradtak):</div><ul className="result-list">{result.errors.map((e) => <li key={e}>{e}</li>)}</ul></>}
       {result.created > 0 && <div style={{ marginTop: 8 }}><button className="btn small" onClick={() => navigate('/admin')}>Piszkozatok ellenőrzése és közzététele →</button></div>}
     </div>
   );
@@ -87,7 +97,7 @@ export default function AdminImport() {
 
         <div className="card">
           <h2>📊 Események importálása táblázatból</h2>
-          <p className="small">Töltsd le a sablont, töltsd ki (egy sor = egy esemény), majd töltsd fel. Az események <b>piszkozatként</b> jönnek létre, így közzététel előtt még ellenőrizheted őket.</p>
+          <p className="small">Töltsd le a sablont, töltsd ki (egy sor = egy esemény), majd töltsd fel. Az események <b>piszkozatként</b> jönnek létre, így közzététel előtt még ellenőrizheted őket. Ha egy esemény (ugyanaz a név, nap, kezdés és kórus) már létezik, a sor kimarad – így ugyanaz a táblázat kétszer feltöltve sem okoz duplikációt.</p>
           <div className="btnrow">
             <a className="btn small" href="/api/admin/templates/esemenyek-xlsx">⬇️ Sablon (Excel)</a>
             <a className="btn small" href="/api/admin/templates/esemenyek-csv">⬇️ Sablon (CSV)</a>
@@ -142,7 +152,7 @@ export default function AdminImport() {
               </label>
               <label className="field"><span>Határidő: nappal előtte</span><input type="number" min={0} max={90} value={icsDays} onChange={(e) => setIcsDays(e.target.value)} /></label>
             </div>
-            <p className="hint">Az esemény típusát a névből ismerjük fel („főpróba”, „próba”, „koncert”, „utazás”). Az ismétlődő események (pl. heti próba) alkalmanként külön eseményként jönnek létre. A már egyszer beimportált eseményeket nem duplikáljuk.</p>
+            <p className="hint">Az esemény típusát a névből ismerjük fel („főpróba”, „próba”, „koncert”, „utazás”). Az ismétlődő események (pl. heti próba) alkalmanként külön eseményként jönnek létre. Az import többször is futtatható: a már beimportált eseményeket nem duplikálja, a naptárban azóta áthelyezett vagy módosított eseményeket pedig frissíti (a közzétett eseményeknél a tagok értesítést kapnak).</p>
             <button className="btn primary block" disabled={busy}>Importálás</button>
           </form>
           <Result result={icsResult} />

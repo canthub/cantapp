@@ -88,7 +88,7 @@ function ImportModal({ onClose }) {
   };
   return (
     <Modal title="Tagok importálása" onClose={() => onClose(Boolean(result))}>
-      <p className="small">1. Töltsd le a sablont, töltsd ki (egy sor = egy tag), majd töltsd fel. A már meglévő tagok adatai az e-mail-cím alapján frissülnek.</p>
+      <p className="small">1. Töltsd le a sablont, töltsd ki (egy sor = egy tag), majd töltsd fel. A tagot az e-mail-címe azonosítja: a már meglévő tagok adatai frissülnek, nem jönnek létre újra. Ha egy e-mail-cím a táblázatban kétszer szerepel, a második sor kimarad.</p>
       <div className="btnrow">
         <a className="btn small" href="/api/admin/templates/tagok-xlsx">⬇️ Sablon (Excel)</a>
         <a className="btn small" href="/api/admin/templates/tagok-csv">⬇️ Sablon (CSV)</a>

@@ -128,6 +128,8 @@ const MIGRATIONS = [
     value TEXT NOT NULL
   );
   `,
+  // A naptárból legutóbb importált értékek – újraimportáláskor csak a naptárban változott mezőket írjuk felül.
+  `ALTER TABLE events ADD COLUMN external_data TEXT;`,
 ];
 
 export function openDb(file) {

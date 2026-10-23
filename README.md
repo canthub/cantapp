@@ -42,6 +42,11 @@ A `templates/` mappában (és az admin felületen letölthetően):
 
 Az Excel-sablonok második munkalapján kitöltési útmutató található.
 
+**Duplikáció elleni védelem:**
+- **Tagok:** a tagot az e-mail-címe azonosítja. Újraimportáláskor a meglévő tagok adatai frissülnek, nem jönnek létre újra. Ha egy cím a táblázaton belül kétszer szerepel, a második sor kimarad, és erről hibaüzenet jelenik meg (ilyenkor az „inaktiválás” opció sem fut le).
+- **Események táblázatból:** ha már létezik azonos nevű esemény (kis- és nagybetű, szóközök nem számítanak) ugyanazon a napon, ugyanabban a kezdési időpontban, közös kórussal, a sor kimarad. Ugyanez vonatkozik a táblázaton belüli ismétlődésekre is.
+- **Google Naptár:** minden naptárbejegyzés (ismétlődőnél minden alkalom) azonosítóval kerül be, így az import nyugodtan többször is futtatható. A naptárban azóta áthelyezett vagy átnevezett eseményeket frissíti, és a közzétett eseményeknél a tagok „Módosult” értesítést kapnak. A határidő ugyanannyi nappal tolódik, mint az esemény. Az appban kézzel módosított mezőket (pl. épület, típus) csak akkor írja felül, ha a naptárban is változtak. Ha egy esemény kézzel vagy táblázatból már fel volt véve, nem duplikálja, hanem összekapcsolja a naptárral.
+
 ## Üzembe helyezés
 
 Szükséges: egy állandóan futó szerver Node.js 22.13+ verzióval (vagy Dockerrel), egy domain HTTPS-sel (a push értesítésekhez kötelező), valamint egy SMTP fiók az e-mailekhez.
