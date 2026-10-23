@@ -24,6 +24,8 @@ export function createApp() {
     next();
   });
 
+  // Állapotellenőrzés a tárhelynek (pl. a Render health check).
+  app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/admin', requireAdmin, adminRouter);
   app.use('/api', memberRouter);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Nem található.' }));

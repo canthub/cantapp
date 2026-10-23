@@ -12,7 +12,8 @@ export const DEFAULT_REPORT_RECIPIENTS = [
 
 export const config = {
   port: Number(process.env.PORT || 3000),
-  appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, ''),
+  // Ha nincs megadva, a tárhely által adott nyilvános címet használjuk (Render: RENDER_EXTERNAL_URL).
+  appUrl: (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000').replace(/\/$/, ''),
   dbPath: process.env.DB_PATH || './data/cantapp.db',
   isProd: process.env.NODE_ENV === 'production',
   smtp: {
@@ -23,6 +24,12 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
   },
   emailFrom: process.env.EMAIL_FROM || 'Cantemus Kórus <noreply@cantemus.hu>',
+  // HTTPS-es levelezőszolgáltatás (megbízhatóbb tömeges küldés, és ott is működik, ahol az SMTP tiltva van):
+  // EMAIL_PROVIDER=brevo vagy resend, EMAIL_API_KEY=… Ha meg van adva, az SMTP helyett ezt használjuk.
+  emailApi: {
+    provider: (process.env.EMAIL_PROVIDER || '').toLowerCase(),
+    apiKey: process.env.EMAIL_API_KEY || '',
+  },
   vapid: {
     publicKey: process.env.VAPID_PUBLIC_KEY || '',
     privateKey: process.env.VAPID_PRIVATE_KEY || '',
@@ -45,5 +52,6 @@ export const config = {
   },
 };
 
-export const emailEnabled = () => Boolean(config.smtp.host);
+export const emailApiEnabled = () => ['brevo', 'resend'].includes(config.emailApi.provider) && Boolean(config.emailApi.apiKey);
+export const emailEnabled = () => emailApiEnabled() || Boolean(config.smtp.host);
 export const pushEnabled = () => Boolean(config.vapid.publicKey && config.vapid.privateKey);

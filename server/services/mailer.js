@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { config, emailEnabled } from '../config.js';
+import { config, emailEnabled, emailApiEnabled } from '../config.js';
 import { getDb, nowIso } from '../db.js';
 
 let transporter;
@@ -18,12 +18,58 @@ function getTransporter() {
   return transporter;
 }
 
+// „Név <cim@domain>” → { name, email }
+export function parseAddress(s) {
+  const m = String(s).match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  return m ? { name: m[1].trim(), email: m[2].trim() } : { name: '', email: String(s).trim() };
+}
+
+const base64 = (content) => Buffer.from(content).toString('base64');
+
+// Küldés HTTPS API-n keresztül (Brevo vagy Resend).
+async function sendViaApi({ recipients, subject, html, text, attachments = [] }) {
+  const from = parseAddress(config.emailFrom);
+  let url;
+  let headers;
+  let body;
+  if (config.emailApi.provider === 'brevo') {
+    url = 'https://api.brevo.com/v3/smtp/email';
+    headers = { 'api-key': config.emailApi.apiKey };
+    body = {
+      sender: { name: from.name || undefined, email: from.email },
+      to: recipients.map((email) => ({ email })),
+      subject,
+      htmlContent: html,
+      textContent: text,
+      ...(attachments.length ? { attachment: attachments.map((a) => ({ name: a.filename, content: base64(a.content) })) } : {}),
+    };
+  } else {
+    url = 'https://api.resend.com/emails';
+    headers = { Authorization: `Bearer ${config.emailApi.apiKey}` };
+    body = {
+      from: config.emailFrom,
+      to: recipients,
+      subject,
+      html,
+      text,
+      ...(attachments.length ? { attachments: attachments.map((a) => ({ filename: a.filename, content: base64(a.content) })) } : {}),
+    };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...headers },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`${config.emailApi.provider} API hiba (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
+}
+
 function log(to, subject, status, error = null) {
   getDb().prepare('INSERT INTO email_log (to_address, subject, status, error, created_at) VALUES (?, ?, ?, ?, ?)')
     .run(to, subject, status, error, nowIso());
 }
 
-// SMTP nélkül (fejlesztéskor) a levelek nem mennek ki, csak a konzolra és az email_log táblába kerülnek.
+// Beállított küldés nélkül (fejlesztéskor) a levelek nem mennek ki, csak a konzolra és az email_log táblába kerülnek.
 export async function sendMail({ to, subject, html, text, attachments }) {
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
   if (recipients.length === 0) return { skipped: true };
@@ -31,12 +77,13 @@ export async function sendMail({ to, subject, html, text, attachments }) {
   if (!emailEnabled()) {
     log(toStr, subject, 'logged');
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`\n[e-mail – nincs SMTP beállítva, nem lett elküldve]\nCímzett: ${toStr}\nTárgy: ${subject}\n${text || ''}\n`);
+      console.log(`\n[e-mail – nincs e-mail-küldés beállítva, nem lett elküldve]\nCímzett: ${toStr}\nTárgy: ${subject}\n${text || ''}\n`);
     }
     return { logged: true };
   }
   try {
-    await getTransporter().sendMail({ from: config.emailFrom, to: toStr, subject, html, text, attachments });
+    if (emailApiEnabled()) await sendViaApi({ recipients, subject, html, text, attachments });
+    else await getTransporter().sendMail({ from: config.emailFrom, to: toStr, subject, html, text, attachments });
     log(toStr, subject, 'sent');
     return { sent: true };
   } catch (err) {
