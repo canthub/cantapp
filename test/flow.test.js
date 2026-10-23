@@ -2,7 +2,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { openDb, getDb } from '../server/db.js';
-import { saveMember, createEvent, setEventStatus, getEventRow, eventStats } from '../server/models.js';
+import { saveMember, createEvent, setEventStatus, getEventRow, eventStats, eligibleMembers } from '../server/models.js';
 import { sendAnnouncements, runScheduler, reminderDue } from '../server/services/scheduler.js';
 import { setResponse } from '../server/services/rsvp.js';
 import { buildReport, reportXlsx, reportCsv } from '../server/services/report.js';
@@ -262,4 +262,72 @@ test('naptár újraimportálás: áthelyezett alkalom frissül, a tagok értesí
   const e1 = await importIcs(easter, opts);
   assert.deepEqual([e1.created, e1.skipped], [0, 1]);
   assert.ok(getDb().prepare(`SELECT 1 FROM events WHERE external_uid = 'ics:husvet@google.com'`).get());
+});
+
+test('naptárból törölt események: felismerés, másik naptár nem zavar, lemondás / törlés / megtartás', async () => {
+  const { createApp } = await import('../server/app.js');
+  const { createSession } = await import('../server/auth.js');
+  const cal = (name, { withSolo = true, exdate = false, cancelledOverride = false } = {}) => [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', `X-WR-CALNAME:${name}`,
+    'BEGIN:VEVENT', `UID:heti-${name}@google.com`, 'DTSTART;TZID=Europe/Budapest:20270406T180000', 'DTEND;TZID=Europe/Budapest:20270406T200000',
+    'RRULE:FREQ=WEEKLY;COUNT=4', ...(exdate ? ['EXDATE;TZID=Europe/Budapest:20270420T180000'] : []), 'SUMMARY:Áprilisi próba', 'END:VEVENT',
+    ...(cancelledOverride ? ['BEGIN:VEVENT', `UID:heti-${name}@google.com`, 'RECURRENCE-ID;TZID=Europe/Budapest:20270413T180000',
+      'DTSTART;TZID=Europe/Budapest:20270413T180000', 'STATUS:CANCELLED', 'SUMMARY:Áprilisi próba', 'END:VEVENT'] : []),
+    ...(withSolo ? ['BEGIN:VEVENT', `UID:solo-${name}@google.com`, 'DTSTART;TZID=Europe/Budapest:20270425T190000', 'SUMMARY:Tavaszi koncert', 'END:VEVENT'] : []),
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const opts = { choirs: ['promusica'], from: '2027-04-01', to: '2027-04-30' };
+
+  // Egy ismétlődő próba lemondott alkalmát már az első importnál sem hozzuk létre.
+  const otherOpts = { ...opts, choirs: ['cantemus'] };
+  const withCancelled = await importIcs(cal('Másik naptár', { cancelledOverride: true }), otherOpts);
+  assert.equal(withCancelled.created, 4, '3 próba + 1 koncert, a lemondott alkalom nélkül');
+
+  const first = await importIcs(cal('Pro Musica naptár'), opts);
+  assert.equal(first.created, 5);
+  assert.deepEqual(first.missing, []);
+  const [p1, , p3, , solo] = first.ids; // időrendben: 04-06, 04-13, 04-20, 04-27 próbák, 04-25 koncert a végén
+  setEventStatus(p3, 'published');
+  await setResponse(p3, eszter, 'yes');
+
+  // A naptárból törölték a 04-20-i alkalmat (EXDATE) és a koncertet.
+  const second = await importIcs(cal('Pro Musica naptár', { withSolo: false, exdate: true }), opts);
+  assert.deepEqual(second.missing.map((m) => m.id).sort(), [p3, solo].sort());
+  const missingP3 = second.missing.find((m) => m.id === p3);
+  assert.equal(missingP3.status, 'published');
+  assert.equal(missingP3.responded, 1);
+  assert.equal(getEventRow(p3).status, 'published', 'magától nem mondunk le semmit');
+
+  // Egy másik naptár importja nem jelzi ezeket töröltnek.
+  const other = await importIcs(cal('Másik naptár', { cancelledOverride: true }), otherOpts);
+  assert.deepEqual(other.missing, []);
+  // Az import időszakán kívül eső eseményeket sem.
+  const narrow = await importIcs(cal('Pro Musica naptár', { withSolo: false, exdate: true }), { ...opts, from: '2027-04-01', to: '2027-04-10' });
+  assert.deepEqual(narrow.missing, []);
+
+  // Döntés az admin felületről: a közzétett próbát lemondjuk, a koncertet (piszkozat) megtartjuk.
+  const admin = saveMember({ lastName: 'Admin', firstName: 'Teszt', email: 'admin-teszt@example.com', isAdmin: true, choirs: [] }).id;
+  const { token } = createSession(admin);
+  const server = createApp().listen(0);
+  try {
+    const res = await fetch(`http://localhost:${server.address().port}/api/admin/import/ics/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'cantapp', Cookie: `cantapp_session=${token}` },
+      body: JSON.stringify({ cancel: [p3], keep: [solo] }),
+    });
+    const body = await res.json();
+    assert.deepEqual([body.cancelled, body.deleted, body.kept], [1, 0, 1]);
+    assert.equal(body.notified, eligibleMembers(p3).length, 'a kórus minden tagja értesítést kap a lemondásról');
+  } finally {
+    server.close();
+  }
+  assert.equal(getEventRow(p3).status, 'cancelled');
+  assert.equal(notificationsOf(eszter, 'cancel').length, 1, 'aki már visszajelzett, az is értesítést kap');
+  assert.equal(getEventRow(solo).external_uid, null, 'a megtartott esemény leválik a naptárról');
+  assert.equal(getEventRow(p1).status, 'draft');
+
+  // A következő import már nem jelzi őket.
+  const third = await importIcs(cal('Pro Musica naptár', { withSolo: false, exdate: true }), opts);
+  assert.deepEqual(third.missing, []);
+  assert.equal(third.created, 0);
 });

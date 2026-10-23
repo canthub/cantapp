@@ -253,7 +253,7 @@ export function findDuplicateEvent({ name, date, startTime, choirs }) {
   return rows.find((r) => sameName(r.name, name) && choirsOfEvent(r.id).some((c) => choirs.includes(c))) || null;
 }
 
-export function createEvent(input, { source = 'manual', externalUid = null, externalData = null, autoLinkDressRehearsal = true } = {}) {
+export function createEvent(input, { source = 'manual', externalUid = null, externalData = null, externalSource = null, autoLinkDressRehearsal = true } = {}) {
   const e = normalizeEventInput(input);
   if (e.type === 'koncert' && !e.dressRehearsalId && autoLinkDressRehearsal) e.dressRehearsalId = suggestDressRehearsal(e);
   checkDressRehearsal(e);
@@ -261,8 +261,8 @@ export function createEvent(input, { source = 'manual', externalUid = null, exte
   const db = getDb();
   return tx(() => {
     const keys = Object.keys(cols);
-    const id = Number(db.prepare(`INSERT INTO events (${keys.join(',')}, source, external_uid, external_data) VALUES (${keys.map(() => '?').join(',')}, ?, ?, ?)`)
-      .run(...Object.values(cols), source, externalUid, externalData ? JSON.stringify(externalData) : null).lastInsertRowid);
+    const id = Number(db.prepare(`INSERT INTO events (${keys.join(',')}, source, external_uid, external_data, external_source) VALUES (${keys.map(() => '?').join(',')}, ?, ?, ?, ?)`)
+      .run(...Object.values(cols), source, externalUid, externalData ? JSON.stringify(externalData) : null, externalSource).lastInsertRowid);
     for (const c of e.choirs) db.prepare('INSERT INTO event_choirs (event_id, choir) VALUES (?, ?)').run(id, c);
     return id;
   });

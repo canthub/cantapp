@@ -103,13 +103,17 @@ adminRouter.post('/events/:id/unpublish', (req, res) => {
   res.json({ event: getEvent(id) });
 });
 
-adminRouter.post('/events/:id/cancel', async (req, res) => {
-  const id = eventId(req);
+// Lemondás: a már közzétett esemény tagjai értesítést kapnak róla.
+async function cancelEvent(id) {
   const wasPublished = getEventRow(id).status === 'published';
   setEventStatus(id, 'cancelled');
   const ev = getEvent(id);
   const notified = wasPublished ? await notifyMembers(eligibleMembers(id).map((m) => m.id), { ...cancelMessage(ev), eventId: id }) : 0;
-  res.json({ event: ev, notified });
+  return { event: ev, notified };
+}
+
+adminRouter.post('/events/:id/cancel', async (req, res) => {
+  res.json(await cancelEvent(eventId(req)));
 });
 
 // Kézi emlékeztető: alapból csak a még vissza nem jelzőknek, kérésre mindenkinek.
@@ -213,12 +217,35 @@ adminRouter.post('/import/events', upload.single('file'), async (req, res) => {
 adminRouter.post('/import/ics', upload.single('file'), async (req, res) => {
   const text = req.file ? req.file.buffer.toString('utf8') : await fetchIcs(String(req.body.url || ''));
   res.json(await importIcs(text, {
+    url: req.file ? null : String(req.body.url || ''),
     choirs: String(req.body.choirs || '').split(',').filter(Boolean),
     from: req.body.from || null,
     to: req.body.to || null,
     deadlineDaysBefore: Number(req.body.deadlineDaysBefore || 7),
     defaultType: req.body.defaultType || 'proba',
   }));
+});
+
+// A naptárból törölt események kezelése: a kijelöltek lemondása (piszkozat esetén törlése),
+// a többi megtartása – ezeket leválasztjuk a naptárról, így a következő import már nem jelzi őket.
+adminRouter.post('/import/ics/resolve', async (req, res) => {
+  const fromCalendar = (id) => getEventRow(Number(id))?.external_uid?.startsWith('ics:');
+  const result = { cancelled: 0, deleted: 0, kept: 0, notified: 0 };
+  for (const id of (req.body?.cancel || []).filter(fromCalendar).map(Number)) {
+    const row = getEventRow(id);
+    if (row.status === 'draft') {
+      deleteEvent(id);
+      result.deleted++;
+    } else if (row.status === 'published') {
+      result.notified += (await cancelEvent(id)).notified;
+      result.cancelled++;
+    }
+  }
+  for (const id of (req.body?.keep || []).filter(fromCalendar).map(Number)) {
+    getDb().prepare('UPDATE events SET external_uid = NULL, external_data = NULL, external_source = NULL WHERE id = ?').run(id);
+    result.kept++;
+  }
+  res.json(result);
 });
 
 const TEMPLATES = {

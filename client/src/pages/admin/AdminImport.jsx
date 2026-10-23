@@ -34,6 +34,63 @@ function Result({ result }) {
   );
 }
 
+// A naptárból azóta törölt (vagy ott lemondott) események: az admin dönti el, mi legyen velük.
+function MissingPanel({ result }) {
+  const [selected, setSelected] = useState(() => new Set(result.missing.map((m) => m.id)));
+  const [done, setDone] = useState(null);
+  const [busy, setBusy] = useState(false);
+  if (!result.canDetectMissing) {
+    return <div className="notice info">Ebben a naptárfájlban nincs naptárnév, ezért a naptárból törölt eseményeket nem tudjuk felismerni. Használd inkább a naptár címét (iCal).</div>;
+  }
+  if (result.missing.length === 0) return null;
+  if (done) {
+    return (
+      <div className="notice ok">
+        Lemondva: <b>{done.cancelled}</b> · Törölve (piszkozat): <b>{done.deleted}</b> · Megtartva: <b>{done.kept}</b>
+        {done.notified > 0 && <div style={{ marginTop: 6 }}>{done.notified} tag kapott értesítést a lemondásról.</div>}
+      </div>
+    );
+  }
+  const toggle = (id) => setSelected((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const publishedSelected = result.missing.filter((m) => selected.has(m.id) && m.status === 'published').length;
+  const resolve = async () => {
+    if (publishedSelected && !confirm(`${publishedSelected} közzétett esemény lemondása? Az érintett tagok értesítést kapnak róla.`)) return;
+    setBusy(true);
+    try {
+      setDone(await api('/admin/import/ics/resolve', {
+        method: 'POST',
+        body: { cancel: [...selected], keep: result.missing.filter((m) => !selected.has(m.id)).map((m) => m.id) },
+      }));
+    } catch (err) {
+      toast(err.message, 'err');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="notice warn">
+      <b>{result.missing.length} esemény már nincs benne a naptárban</b> (törölték vagy lemondták). Mi legyen velük?
+      <div style={{ margin: '10px 0' }}>
+        {result.missing.map((m) => (
+          <label key={m.id} className="check" style={{ alignItems: 'flex-start' }}>
+            <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)} />
+            <span>
+              <b>{m.name}</b> – {m.date}{m.startTime && ` ${m.startTime}`}
+              <span className="small"> · {m.status === 'draft' ? 'piszkozat → törlés' : `közzétett → lemondás${m.responded ? `, ${m.responded} tag már visszajelzett` : ''}`}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="small">A kijelölt piszkozatokat töröljük, a kijelölt közzétett eseményeket lemondjuk (a tagok értesítést kapnak). A ki nem jelölteket megtartjuk, és leválasztjuk a naptárról.</p>
+      <button className="btn primary" disabled={busy} onClick={resolve}>Végrehajtás</button>
+      <p className="small" style={{ marginTop: 8, marginBottom: 0 }}>Ha most nem döntesz, a következő importnál újra megjelennek.</p>
+    </div>
+  );
+}
+
 export default function AdminImport() {
   // Táblázat
   const [file, setFile] = useState(null);
@@ -81,7 +138,7 @@ export default function AdminImport() {
       if (to) form.append('to', to);
       form.append('deadlineDaysBefore', String(icsDays));
       form.append('defaultType', defaultType);
-      setIcsResult(await api('/admin/import/ics', { method: 'POST', form }));
+      setIcsResult({ ...(await api('/admin/import/ics', { method: 'POST', form })), runId: Date.now() });
     } catch (err) {
       toast(err.message, 'err');
     } finally {
@@ -152,10 +209,11 @@ export default function AdminImport() {
               </label>
               <label className="field"><span>Határidő: nappal előtte</span><input type="number" min={0} max={90} value={icsDays} onChange={(e) => setIcsDays(e.target.value)} /></label>
             </div>
-            <p className="hint">Az esemény típusát a névből ismerjük fel („főpróba”, „próba”, „koncert”, „utazás”). Az ismétlődő események (pl. heti próba) alkalmanként külön eseményként jönnek létre. Az import többször is futtatható: a már beimportált eseményeket nem duplikálja, a naptárban azóta áthelyezett vagy módosított eseményeket pedig frissíti (a közzétett eseményeknél a tagok értesítést kapnak).</p>
+            <p className="hint">Az esemény típusát a névből ismerjük fel („főpróba”, „próba”, „koncert”, „utazás”). Az ismétlődő események (pl. heti próba) alkalmanként külön eseményként jönnek létre. Az import többször is futtatható: a már beimportált eseményeket nem duplikálja, a naptárban azóta áthelyezett vagy módosított eseményeket frissíti (a közzétett eseményeknél a tagok értesítést kapnak), a naptárból törölteket pedig felajánlja lemondásra.</p>
             <button className="btn primary block" disabled={busy}>Importálás</button>
           </form>
           <Result result={icsResult} />
+          {icsResult && <MissingPanel key={icsResult.runId} result={icsResult} />}
         </div>
       </div>
     </>

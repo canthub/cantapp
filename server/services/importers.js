@@ -1,9 +1,10 @@
+import crypto from 'node:crypto';
 import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import ical from 'node-ical';
 import { DateTime } from 'luxon';
 import {
-  createEvent, updateEvent, getEvent, findDuplicateEvent, normalizeEventInput, eligibleMembers, saveMember, setMemberActive, listMembers,
+  createEvent, updateEvent, getEvent, findDuplicateEvent, normalizeEventInput, eligibleMembers, eventStats, saveMember, setMemberActive, listMembers,
 } from '../models.js';
 import { getDb, tx } from '../db.js';
 import { TZ, defaultDeadlineDate } from './time.js';
@@ -287,7 +288,39 @@ function syncFromCalendar(row, cal) {
 
 const FIELD_LABELS = { name: 'név', date: 'dátum', startTime: 'kezdés', endTime: 'befejezés', address: 'helyszín', notes: 'leírás' };
 
-export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = config.defaultDeadlineDays, defaultType = 'proba' }) {
+const isCancelled = (inst) => inst.event.status === 'CANCELLED';
+
+// A naptár azonosítója: a naptár neve (Google mindig megadja), ennek hiányában a letöltési cím.
+// Csak az ugyanebből a naptárból származó eseményeket tekintjük „törölt”-nek, ha eltűnnek belőle.
+function calendarSourceKey(data, url) {
+  const name = paramText(Object.values(data).find((x) => x.type === 'VCALENDAR')?.['WR-CALNAME']);
+  if (name) return `calname:${name}`;
+  if (url) return `url:${crypto.createHash('sha256').update(url.trim()).digest('hex')}`;
+  return null;
+}
+
+// Az import időszakába eső, ebből a naptárból korábban importált, de a naptárból azóta törölt
+// (vagy ott lemondott) események. Ezekről az admin dönt: lemondja / törli, vagy megtartja.
+function findMissingEvents(data, sourceKey, fromDate, toDate) {
+  const year = 365 * 86400000;
+  const live = new Set();
+  for (const item of Object.values(data)) {
+    if (item.type !== 'VEVENT' || item.status === 'CANCELLED') continue;
+    // Széles ablak: a naptárban messzire áthelyezett alkalom se számítson töröltnek.
+    const wide = { from: new Date(fromDate.getTime() - year), to: new Date(toDate.getTime() + year) };
+    for (const inst of ical.expandRecurringEvent(item, wide)) if (!isCancelled(inst)) live.add(instanceUid(inst));
+  }
+  return getDb()
+    .prepare(`SELECT * FROM events WHERE external_source = ? AND status != 'cancelled' AND starts_at >= ? AND starts_at <= ? ORDER BY starts_at`)
+    .all(sourceKey, fromDate.toISOString(), toDate.toISOString())
+    .filter((r) => !live.has(r.external_uid))
+    .map((r) => {
+      const stats = eventStats(r.id);
+      return { id: r.id, name: r.name, date: r.date, startTime: r.start_time, status: r.status, responded: stats.total - stats.none };
+    });
+}
+
+export async function importIcs(text, { choirs, from, to, url = null, deadlineDaysBefore = config.defaultDeadlineDays, defaultType = 'proba' }) {
   if (!choirs?.length) throw Object.assign(new Error('Válaszd ki, melyik énekkar eseményei ezek!'), { status: 400 });
   let data;
   try {
@@ -297,14 +330,18 @@ export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = c
   }
   const fromDate = from ? DateTime.fromISO(from, { zone: TZ }).startOf('day').toJSDate() : new Date();
   const toDate = to ? DateTime.fromISO(to, { zone: TZ }).endOf('day').toJSDate() : DateTime.now().plus({ months: 12 }).toJSDate();
-  const result = { created: 0, updated: 0, skipped: 0, notified: 0, updatedItems: [], skippedItems: [], errors: [], ids: [] };
+  const sourceKey = calendarSourceKey(data, url);
+  const result = {
+    created: 0, updated: 0, skipped: 0, notified: 0, updatedItems: [], skippedItems: [], errors: [], ids: [], missing: [], canDetectMissing: Boolean(sourceKey),
+  };
   const byUid = getDb().prepare('SELECT * FROM events WHERE external_uid = ?');
   const toNotify = [];
 
   const instances = [];
   for (const item of Object.values(data)) {
     if (item.type !== 'VEVENT' || item.status === 'CANCELLED') continue;
-    for (const inst of ical.expandRecurringEvent(item, { from: fromDate, to: toDate })) instances.push(inst);
+    // Az ismétlődő esemény egyetlen lemondott alkalmát sem importáljuk.
+    for (const inst of ical.expandRecurringEvent(item, { from: fromDate, to: toDate })) if (!isCancelled(inst)) instances.push(inst);
   }
   instances.sort((a, b) => a.start - b.start);
   // A főpróbák előbb, hogy a koncertek hozzájuk kapcsolódhassanak.
@@ -317,6 +354,9 @@ export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = c
       const label = `„${cal.name}” (${cal.date}${cal.startTime ? ` ${cal.startTime}` : ''})`;
       try {
         const existing = byUid.get(uid);
+        if (existing && sourceKey && existing.external_source !== sourceKey) {
+          getDb().prepare('UPDATE events SET external_source = ? WHERE id = ?').run(sourceKey, existing.id);
+        }
         if (existing) {
           const { changed, importantChange } = syncFromCalendar(existing, cal);
           if (changed.length === 0) {
@@ -331,7 +371,9 @@ export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = c
         // Kézzel vagy táblázatból már felvett ugyanilyen esemény: nem duplikáljuk, hanem összekötjük a naptárral.
         const twin = findDuplicateEvent({ ...cal, choirs });
         if (twin) {
-          if (!twin.external_uid) getDb().prepare('UPDATE events SET external_uid = ?, external_data = ? WHERE id = ?').run(uid, JSON.stringify(cal), twin.id);
+          if (!twin.external_uid) {
+            getDb().prepare('UPDATE events SET external_uid = ?, external_data = ?, external_source = ? WHERE id = ?').run(uid, JSON.stringify(cal), sourceKey, twin.id);
+          }
           result.skipped++;
           result.skippedItems.push(`${label} már létezik az appban – kihagyva.`);
           continue;
@@ -342,13 +384,14 @@ export async function importIcs(text, { choirs, from, to, deadlineDaysBefore = c
           isTour: /turn[eé]/i.test(cal.name),
           deadlineDate: defaultDeadlineDate(cal.date, deadlineDaysBefore),
           choirs,
-        }, { source: 'ics', externalUid: uid, externalData: cal });
+        }, { source: 'ics', externalUid: uid, externalData: cal, externalSource: sourceKey });
         result.created++;
         result.ids.push(id);
       } catch (err) {
         result.errors.push(`${label}: ${err.message}`);
       }
     }
+    if (sourceKey) result.missing = findMissingEvents(data, sourceKey, fromDate, toDate);
   });
 
   // A már közzétett események időpont- vagy helyszínváltozásáról a tagok értesítést kapnak.
