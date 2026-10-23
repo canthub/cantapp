@@ -12,6 +12,20 @@ function init() {
   return initialized;
 }
 
+// Ha a környezeti változókban nincs VAPID kulcspár, első induláskor generálunk egyet és az adatbázisban
+// tároljuk – így a push értesítések külön beállítás nélkül is működnek, és újraindítás után is ugyanazok maradnak.
+export function ensureVapidKeys() {
+  if (config.vapid.publicKey && config.vapid.privateKey) return;
+  const row = getDb().prepare(`SELECT value FROM settings WHERE key = 'vapidKeys'`).get();
+  let keys = row ? JSON.parse(row.value) : null;
+  if (!keys) {
+    keys = webpush.generateVAPIDKeys();
+    getDb().prepare(`INSERT INTO settings (key, value) VALUES ('vapidKeys', ?)`).run(JSON.stringify(keys));
+  }
+  config.vapid.publicKey = keys.publicKey;
+  config.vapid.privateKey = keys.privateKey;
+}
+
 export function saveSubscription(memberId, sub) {
   if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) throw Object.assign(new Error('Hibás feliratkozás.'), { status: 400 });
   getDb().prepare(`INSERT INTO push_subscriptions (member_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)

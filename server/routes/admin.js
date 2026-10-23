@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { getDb } from '../db.js';
 import {
@@ -295,6 +297,14 @@ adminRouter.put('/settings', (req, res) => {
   if (recipients.length === 0) throw new ValidationError('Legalább egy címzett szükséges.');
   setSetting('reportRecipients', recipients);
   res.json({ reportRecipients: recipients });
+});
+
+// Teljes adatmentés: az adatbázis konzisztens másolata (VACUUM INTO), letölthető fájlként.
+adminRouter.get('/backup', (_req, res) => {
+  const file = path.join(os.tmpdir(), `cantapp-backup-${process.pid}-${Date.now()}.db`);
+  getDb().exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+  const name = `cantapp-mentes-${new Date().toISOString().slice(0, 10)}.db`;
+  res.download(file, name, () => fs.rm(file, { force: true }, () => {}));
 });
 
 adminRouter.post('/test/email', async (req, res) => {

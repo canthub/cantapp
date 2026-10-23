@@ -4,15 +4,17 @@ import { ensureAdmins } from './models.js';
 import { createApp } from './app.js';
 import { startScheduler } from './services/scheduler.js';
 import { setAppUrl } from './services/notify.js';
+import { ensureVapidKeys } from './services/push.js';
 
 openDb(config.dbPath);
 ensureAdmins(config.adminEmails);
 setAppUrl(config.appUrl);
+ensureVapidKeys();
 
 createApp().listen(config.port, () => {
   console.log(`Cantemus Kórus app fut: ${config.appUrl} (port ${config.port})`);
-  if (!emailEnabled()) console.warn('⚠️  Nincs SMTP beállítva – az e-mailek csak a konzolra kerülnek.');
-  if (!pushEnabled()) console.warn('⚠️  Nincs VAPID kulcs – a push értesítések ki vannak kapcsolva (npm run vapid).');
+  if (!emailEnabled()) console.warn('⚠️  Nincs e-mail-küldés beállítva (SMTP vagy EMAIL_PROVIDER) – az e-mailek csak a konzolra kerülnek.');
+  if (!pushEnabled()) console.warn('⚠️  Nincs VAPID kulcs – a push értesítések ki vannak kapcsolva.');
   if (config.adminEmails.length === 0) console.warn('⚠️  Nincs ADMIN_EMAILS beállítva – senki sem tud adminként belépni.');
 });
 

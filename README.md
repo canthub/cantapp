@@ -59,13 +59,15 @@ Az Excel-sablonok második munkalapján kitöltési útmutató található.
 
 ## Üzembe helyezés
 
-Szükséges: egy állandóan futó szerver Node.js 22.13+ verzióval (vagy Dockerrel), egy domain HTTPS-sel (a push értesítésekhez kötelező), valamint egy SMTP fiók az e-mailekhez.
+> **Railway-re telepítés lépésről lépésre: [RAILWAY.md](RAILWAY.md)**
+
+Más tárhelyen: egy állandóan futó szerver kell Node.js 22.13+ verzióval (vagy Dockerrel), egy domain HTTPS-sel (a push értesítésekhez kötelező), valamint e-mail-küldés (SMTP, vagy Brevo/Resend API).
 
 1. **Beállítások:** másold a `.env.example` fájlt `.env` néven, és töltsd ki:
    - `APP_URL`: az app címe, pl. `https://korus.cantemus.hu`
    - `ADMIN_EMAILS`: kik legyenek adminok (ezekkel a címekkel lehet először belépni)
-   - `SMTP_*`: a levelezőszerver adatai (pl. a cantemus.hu levelezése, vagy egy szolgáltató, mint a Brevo vagy a Mailgun)
-   - `VAPID_*`: futtasd az `npm run vapid` parancsot, és másold be a két kulcsot
+   - e-mail: vagy `SMTP_*` (a levelezőszerver adatai), vagy `EMAIL_PROVIDER=brevo|resend` + `EMAIL_API_KEY` (ahol az SMTP le van tiltva, pl. a Railway Hobby csomagján)
+   - `VAPID_*` (nem kötelező): ha nincs megadva, az app első induláskor generál egy kulcspárt, és az adatbázisban tárolja
 2. **Indítás Dockerrel:**
    ```bash
    docker build -t cantapp .

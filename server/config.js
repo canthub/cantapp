@@ -23,6 +23,12 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
   },
   emailFrom: process.env.EMAIL_FROM || 'Cantemus Kórus <noreply@cantemus.hu>',
+  // HTTPS-es levelezőszolgáltatás (pl. ahol az SMTP le van tiltva, mint a Railway Hobby csomagján):
+  // EMAIL_PROVIDER=brevo vagy resend, EMAIL_API_KEY=… Ha meg van adva, az SMTP helyett ezt használjuk.
+  emailApi: {
+    provider: (process.env.EMAIL_PROVIDER || '').toLowerCase(),
+    apiKey: process.env.EMAIL_API_KEY || '',
+  },
   vapid: {
     publicKey: process.env.VAPID_PUBLIC_KEY || '',
     privateKey: process.env.VAPID_PRIVATE_KEY || '',
@@ -45,5 +51,6 @@ export const config = {
   },
 };
 
-export const emailEnabled = () => Boolean(config.smtp.host);
+export const emailApiEnabled = () => ['brevo', 'resend'].includes(config.emailApi.provider) && Boolean(config.emailApi.apiKey);
+export const emailEnabled = () => emailApiEnabled() || Boolean(config.smtp.host);
 export const pushEnabled = () => Boolean(config.vapid.publicKey && config.vapid.privateKey);

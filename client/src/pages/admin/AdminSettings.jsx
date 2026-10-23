@@ -28,7 +28,7 @@ export default function AdminSettings() {
   const test = async (kind) => {
     try {
       const res = await api(`/admin/test/${kind}`, { method: 'POST' });
-      if (kind === 'email') toast(res.logged ? 'Nincs SMTP beállítva – a levél csak a szerver naplójába került.' : 'Teszt e-mail elküldve a saját címedre.');
+      if (kind === 'email') toast(res.logged ? 'Nincs e-mail-küldés beállítva – a levél csak a szerver naplójába került.' : 'Teszt e-mail elküldve a saját címedre.');
       else toast(res.sent ? 'Teszt értesítés elküldve.' : 'Nincs push feliratkozásod – előbb kapcsold be a Profil oldalon.', res.sent ? 'ok' : 'err');
     } catch (err) {
       toast(err.message, 'err');
@@ -56,6 +56,11 @@ export default function AdminSettings() {
             <button className="btn" onClick={() => test('email')}>Teszt e-mail magamnak</button>
             <button className="btn" onClick={() => test('push')}>Teszt push értesítés magamnak</button>
           </div>
+        </div>
+        <div className="card">
+          <h2>💾 Adatmentés</h2>
+          <p className="small">A teljes adatbázis (tagok, események, visszajelzések) letöltése egyetlen fájlban. Érdemes havonta egyszer letölteni és biztonságos helyen (pl. Google Drive) tárolni.</p>
+          <a className="btn" href="/api/admin/backup">⬇️ Teljes adatmentés letöltése</a>
         </div>
         <div className="card">
           <h2>ℹ️ Automatikus működés</h2>
