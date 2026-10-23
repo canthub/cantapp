@@ -1,4 +1,4 @@
-import { CHOIRS, article, missedMessage, THANK_YOU_MESSAGE } from '../../shared/constants.js';
+import { CHOIRS, article, missedMessage, THANK_YOU_MESSAGE, UNINVITED_MESSAGE } from '../../shared/constants.js';
 import { formatDateHu, formatIsoHu } from './time.js';
 import { esc } from './mailer.js';
 
@@ -87,6 +87,18 @@ export function missedEventMessage(ev) {
     body: missedMessage(ev.name),
     url: eventUrl(ev),
     emailHtml: '',
+  };
+}
+
+export function uninvitedMessage(ev) {
+  return {
+    kind: 'uninvited',
+    title: `Változás: ${ev.name}`,
+    body: UNINVITED_MESSAGE,
+    url: eventUrl(ev),
+    // A szöveg maga a megszólítással kezdődik, ezért az e-mailbe nem teszünk külön „Kedves …!” sort.
+    greeting: false,
+    emailHtml: details(ev),
   };
 }
 

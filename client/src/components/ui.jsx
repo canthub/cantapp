@@ -45,6 +45,7 @@ export { RESPONSE_ICONS };
 
 export function ResponsePill({ ev }) {
   if (ev.status === 'cancelled') return <span className="pill no">Elmarad</span>;
+  if (ev.invited === false) return <span className="pill none">Most nem vagy meghívva</span>;
   if (ev.myResponse) return <span className={`pill ${ev.myResponse}`}>{RESPONSE_ICONS[ev.myResponse]} {RESPONSES[ev.myResponse]}</span>;
   if (ev.isOpen) return <span className="pill todo">⏳ Jelezz vissza! ({relativeDeadline(ev.deadlineAt)})</span>;
   return <span className="pill none">Nem jeleztél vissza</span>;

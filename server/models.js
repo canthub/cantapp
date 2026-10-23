@@ -154,6 +154,7 @@ export function serializeEvent(row, now = new Date()) {
     reportSentAt: row.report_sent_at,
     source: row.source,
     choirs: choirsOfEvent(row.id),
+    inviteMode: row.invite_mode,
     isOpen: isEventOpen(row, now),
   };
   ev.mapsUrl = mapsUrl(ev);
@@ -194,6 +195,9 @@ export function normalizeEventInput(input) {
     dressRehearsalId: input.dressRehearsalId ? Number(input.dressRehearsalId) : null,
     notes: str(input.notes),
     choirs: [...new Set((input.choirs || []).filter((c) => c in CHOIRS))],
+    inviteMode: input.inviteMode === 'selected' ? 'selected' : 'all',
+    // null = a meglévő meghívotti lista változatlan marad (pl. naptárszinkronnál)
+    invitees: Array.isArray(input.invitees) ? [...new Set(input.invitees.map(Number).filter(Number.isInteger))] : null,
   };
   if (!e.name) throw new ValidationError('Az esemény nevének megadása kötelező.');
   if (!(e.type in EVENT_TYPES)) throw new ValidationError('Érvénytelen eseménytípus.');
@@ -205,7 +209,21 @@ export function normalizeEventInput(input) {
   if (!isDate(e.deadlineDate)) throw new ValidationError(`Érvénytelen visszajelzési határidő: „${e.deadlineDate}”.`);
   if (!isTime(e.deadlineTime)) throw new ValidationError('Érvénytelen határidő-időpont.');
   if (e.type !== 'koncert') e.dressRehearsalId = null;
+  if (e.inviteMode === 'selected' && e.invitees?.length === 0) throw new ValidationError('Legalább egy meghívott tagot ki kell jelölni.');
   return e;
+}
+
+export function getInvitees(eventId) {
+  return getDb().prepare('SELECT member_id FROM event_invites WHERE event_id = ?').all(eventId).map((r) => r.member_id);
+}
+
+function writeInvitees(eventId, e) {
+  const db = getDb();
+  if (e.inviteMode === 'all') db.prepare('DELETE FROM event_invites WHERE event_id = ?').run(eventId);
+  else if (e.invitees) {
+    db.prepare('DELETE FROM event_invites WHERE event_id = ?').run(eventId);
+    for (const m of e.invitees) db.prepare('INSERT OR IGNORE INTO event_invites (event_id, member_id) SELECT ?, id FROM members WHERE id = ?').run(eventId, m);
+  }
 }
 
 function eventColumns(e) {
@@ -224,6 +242,7 @@ function eventColumns(e) {
     deadline_at: deadlineToUtcIso(e.deadlineDate, e.deadlineTime),
     dress_rehearsal_id: e.dressRehearsalId,
     notes: e.notes,
+    invite_mode: e.inviteMode,
   };
 }
 
@@ -255,6 +274,7 @@ export function findDuplicateEvent({ name, date, startTime, choirs }) {
 
 export function createEvent(input, { source = 'manual', externalUid = null, externalData = null, externalSource = null, autoLinkDressRehearsal = true } = {}) {
   const e = normalizeEventInput(input);
+  if (e.inviteMode === 'selected' && !e.invitees) throw new ValidationError('Legalább egy meghívott tagot ki kell jelölni.');
   if (e.type === 'koncert' && !e.dressRehearsalId && autoLinkDressRehearsal) e.dressRehearsalId = suggestDressRehearsal(e);
   checkDressRehearsal(e);
   const cols = eventColumns(e);
@@ -264,15 +284,21 @@ export function createEvent(input, { source = 'manual', externalUid = null, exte
     const id = Number(db.prepare(`INSERT INTO events (${keys.join(',')}, source, external_uid, external_data, external_source) VALUES (${keys.map(() => '?').join(',')}, ?, ?, ?, ?)`)
       .run(...Object.values(cols), source, externalUid, externalData ? JSON.stringify(externalData) : null, externalSource).lastInsertRowid);
     for (const c of e.choirs) db.prepare('INSERT INTO event_choirs (event_id, choir) VALUES (?, ?)').run(id, c);
+    writeInvitees(id, e);
     return id;
   });
 }
 
-// Visszaadja, hogy változott-e lényeges adat (dátum, idő, helyszín) – erről értesítést lehet küldeni.
+// Visszaadja, hogy változott-e lényeges adat (dátum, idő, helyszín) – erről értesítést lehet küldeni –,
+// valamint hogy kik kerültek ki a meghívottak közül, illetve kik kerültek be.
 export function updateEvent(id, input, now = new Date()) {
   const before = getEventRow(id);
   if (!before) throw Object.assign(new Error('Az esemény nem található.'), { status: 404 });
   const e = normalizeEventInput(input);
+  if (e.inviteMode === 'selected' && !e.invitees && before.invite_mode !== 'selected') {
+    throw new ValidationError('Legalább egy meghívott tagot ki kell jelölni.');
+  }
+  const invitedBefore = new Set(eligibleMembers(id).map((m) => m.id));
   checkDressRehearsal(e, id);
   const cols = eventColumns(e);
   const db = getDb();
@@ -282,13 +308,19 @@ export function updateEvent(id, input, now = new Date()) {
       .run(...Object.values(cols), nowIso(now), id);
     db.prepare('DELETE FROM event_choirs WHERE event_id = ?').run(id);
     for (const c of e.choirs) db.prepare('INSERT INTO event_choirs (event_id, choir) VALUES (?, ?)').run(id, c);
+    writeInvitees(id, e);
     // Ha a határidőt kitolták, az esemény újra nyitottá válik.
     if (before.closed_at && new Date(cols.deadline_at) > new Date(now)) {
       db.prepare('UPDATE events SET closed_at = NULL, report_sent_at = NULL WHERE id = ?').run(id);
     }
   });
   const keyFields = ['date', 'start_time', 'end_time', 'country', 'city', 'address', 'venue'];
-  return { importantChange: keyFields.some((k) => before[k] !== cols[k]) };
+  const invitedAfter = new Set(eligibleMembers(id).map((m) => m.id));
+  return {
+    importantChange: keyFields.some((k) => before[k] !== cols[k]),
+    removed: [...invitedBefore].filter((m) => !invitedAfter.has(m)),
+    added: [...invitedAfter].filter((m) => !invitedBefore.has(m)),
+  };
 }
 
 export function deleteEvent(id) {
@@ -304,23 +336,21 @@ export function setEventStatus(id, status, now = new Date()) {
   }
 }
 
-// Az eseményre jogosult (aktív, érintett kórusba tartozó) tagok.
+// Az eseményre meghívott tagok: az érintett kórus(ok) aktív tagjai – „csak kijelöltek” módban
+// közülük csak a kijelöltek. Csak ők kapnak értesítést, és csak ők jelezhetnek vissza.
+const INVITED_SQL = `FROM members m
+  JOIN member_choirs mc ON mc.member_id = m.id
+  JOIN event_choirs ec ON ec.choir = mc.choir
+  JOIN events e ON e.id = ec.event_id
+  WHERE ec.event_id = ? AND m.active = 1
+    AND (e.invite_mode = 'all' OR EXISTS (SELECT 1 FROM event_invites ei WHERE ei.event_id = e.id AND ei.member_id = m.id))`;
+
 export function eligibleMembers(eventId) {
-  return getDb()
-    .prepare(`SELECT DISTINCT m.* FROM members m
-      JOIN member_choirs mc ON mc.member_id = m.id
-      JOIN event_choirs ec ON ec.choir = mc.choir
-      WHERE ec.event_id = ? AND m.active = 1
-      ORDER BY m.last_name, m.first_name`)
-    .all(eventId);
+  return getDb().prepare(`SELECT DISTINCT m.* ${INVITED_SQL} ORDER BY m.last_name, m.first_name`).all(eventId);
 }
 
 export function isEligible(eventId, memberId) {
-  return Boolean(getDb()
-    .prepare(`SELECT 1 FROM member_choirs mc JOIN event_choirs ec ON ec.choir = mc.choir
-      JOIN members m ON m.id = mc.member_id
-      WHERE ec.event_id = ? AND mc.member_id = ? AND m.active = 1`)
-    .get(eventId, memberId));
+  return Boolean(getDb().prepare(`SELECT 1 ${INVITED_SQL} AND m.id = ?`).get(eventId, memberId));
 }
 
 export function getResponse(eventId, memberId) {

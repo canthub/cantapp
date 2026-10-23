@@ -331,3 +331,67 @@ test('naptárból törölt események: felismerés, másik naptár nem zavar, le
   assert.deepEqual(third.missing, []);
   assert.equal(third.created, 0);
 });
+
+test('meghívottak: csak a kijelöltek kapnak értesítést, a kivett tag üzenetet kap, a szabály csak a főpróbára meghívottakra vonatkozik', async () => {
+  const { createApp } = await import('../server/app.js');
+  const { createSession } = await import('../server/auth.js');
+  const { UNINVITED_MESSAGE } = await import('../shared/constants.js');
+  const mk = (first, voice) => saveMember({ lastName: 'Meghívás', firstName: first, email: `${first.toLowerCase()}@meghivas.hu`, voicePart: voice, choirs: ['cantemus'] }).id;
+  const m1 = mk('Szilvia', 'Szoprán 1');
+  const m2 = mk('Aliz', 'Alt 1');
+  const m3 = mk('Tamás', 'Tenor 2');
+  const admin = saveMember({ lastName: 'Admin', firstName: 'Meghívó', email: 'admin-meghivo@example.com', isAdmin: true, choirs: [] }).id;
+  const { token } = createSession(admin);
+  const server = createApp().listen(0);
+  const call = async (method, path, body) => {
+    const res = await fetch(`http://localhost:${server.address().port}/api/admin${path}`, {
+      method, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'cantapp', Cookie: `cantapp_session=${token}` }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+  };
+  const base = { name: 'Szólampróba', type: 'proba', date: '2027-05-10', startTime: '18:00', choirs: ['cantemus'], deadlineDate: '2027-05-08' };
+  try {
+    await assert.rejects(call('POST', '/events', { ...base, inviteMode: 'selected', invitees: [] }), /Legalább egy meghívott/);
+    const { event } = await call('POST', '/events', { ...base, inviteMode: 'selected', invitees: [m1, m2], publish: true });
+    const id = event.id;
+    assert.equal(notificationsOf(m1, 'announce').filter((n) => n.event_id === id).length, 1);
+    assert.equal(notificationsOf(m2, 'announce').filter((n) => n.event_id === id).length, 1);
+    assert.equal(notificationsOf(m3, 'announce').filter((n) => n.event_id === id).length, 0, 'aki nincs meghívva, nem kap értesítést');
+    assert.equal(eventStats(id).total, 2);
+    await assert.rejects(setResponse(id, m3, 'yes'), /most nem vagy meghívva/);
+    await setResponse(id, m2, 'yes');
+
+    // Aliz kikerül, Tamás bekerül.
+    const upd = await call('PUT', `/events/${id}`, { ...base, inviteMode: 'selected', invitees: [m1, m3] });
+    assert.deepEqual([upd.uninvited, upd.announced], [1, 1]);
+    const msg = notificationsOf(m2, 'uninvited');
+    assert.equal(msg.length, 1);
+    assert.equal(msg[0].body, UNINVITED_MESSAGE);
+    assert.equal(msg[0].title, 'Változás: Szólampróba');
+    assert.ok(getDb().prepare(`SELECT 1 FROM email_log WHERE to_address = 'aliz@meghivas.hu' AND subject = 'Változás: Szólampróba'`).get(), 'e-mailben is megkapja');
+    assert.equal(eventStats(id).yes, 0, 'a kivett tag válasza törlődött');
+    assert.equal(notificationsOf(m3, 'announce').filter((n) => n.event_id === id).length, 1, 'az új meghívott értesítést kap');
+
+    // Naptárszinkron jellegű mentés (meghívotti lista nélkül) nem bántja a listát.
+    await call('PUT', `/events/${id}`, { ...base, inviteMode: 'selected', name: 'Szólampróba' });
+    assert.equal(eventStats(id).total, 2);
+
+    // Mindenki meghívása: Aliz újra értesítést kap az eseményről.
+    await call('PUT', `/events/${id}`, { ...base, inviteMode: 'all' });
+    assert.equal(notificationsOf(m2, 'announce').filter((n) => n.event_id === id).length, 2);
+
+    // A riport szólamsorrendben (S, A, T) listáz.
+    const voices = Object.keys(buildReport(id).byVoice);
+    assert.ok(voices.indexOf('Szoprán 1') < voices.indexOf('Alt 1') && voices.indexOf('Alt 1') < voices.indexOf('Tenor 2'));
+
+    // Főpróba csak Szilviának, koncert mindenkinek: Tamásra nem vonatkozik a főpróba-szabály, Szilviára igen.
+    const dr = await call('POST', '/events', { ...base, name: 'Szólam főpróba', type: 'foproba', date: '2027-05-20', deadlineDate: '2027-05-15', inviteMode: 'selected', invitees: [m1], publish: true });
+    const concert = await call('POST', '/events', { ...base, name: 'Szólamkoncert', type: 'koncert', date: '2027-05-21', deadlineDate: '2027-05-15', dressRehearsalId: dr.event.id, publish: true });
+    await setResponse(concert.event.id, m3, 'yes');
+    await assert.rejects(setResponse(concert.event.id, m1, 'yes'), /főpróbára is jelezted/);
+  } finally {
+    server.close();
+  }
+});

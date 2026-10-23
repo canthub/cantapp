@@ -6,9 +6,9 @@ import { getDb } from '../db.js';
 import {
   listEvents, getEvent, getEventRow, createEvent, updateEvent, deleteEvent, setEventStatus, eventStats,
   eligibleMembers, responsesByMember, listMembers, getMember, saveMember, setMemberActive,
-  reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput,
+  reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput, getInvitees,
 } from '../models.js';
-import { setResponse } from '../services/rsvp.js';
+import { setResponse, withdrawInvitations } from '../services/rsvp.js';
 import { notifyMembers, logReminder } from '../services/notify.js';
 import { reminderMessage, generalReminderMessage, changeMessage, cancelMessage } from '../services/messages.js';
 import { sendAnnouncements } from '../services/scheduler.js';
@@ -61,18 +61,24 @@ adminRouter.get('/events/:id', (req, res) => {
     .all(id).map((r) => [r.member_id, { last: r.last, count: r.n }]));
   const rows = report.rows.map((r) => ({ ...r, reminders: lastReminders.get(r.memberId) || null }));
   const concerts = getDb().prepare(`SELECT id, name, date FROM events WHERE dress_rehearsal_id = ?`).all(id);
-  res.json({ event: report.event, summary: report.summary, byVoice: report.byVoice, rows, concerts, recipients: reportRecipients() });
+  const invitees = report.event.inviteMode === 'selected' ? getInvitees(id) : null;
+  res.json({ event: { ...report.event, invitees }, summary: report.summary, byVoice: report.byVoice, rows, concerts, recipients: reportRecipients() });
 });
 
 adminRouter.put('/events/:id', async (req, res) => {
   const id = eventId(req);
-  const { importantChange } = updateEvent(id, req.body);
+  const { importantChange, removed, added } = updateEvent(id, req.body);
   const ev = getEvent(id);
   let notified = 0;
+  // Akit kivettek a meghívottak közül: üzenetet kap, a válasza törlődik.
+  const uninvited = await withdrawInvitations(id, removed);
+  // Az újonnan meghívottak a szokásos „Új esemény” értesítést kapják, nekik nem kell külön változásjelzés.
+  const announced = ev.status === 'published' ? await sendAnnouncements(id) : 0;
   if (importantChange && req.body.notifyChange && ev.status === 'published') {
-    notified = await notifyMembers(eligibleMembers(id).map((m) => m.id), { ...changeMessage(ev), eventId: id });
+    const targets = eligibleMembers(id).map((m) => m.id).filter((m) => !added.includes(m));
+    notified = await notifyMembers(targets, { ...changeMessage(ev), eventId: id });
   }
-  res.json({ event: ev, importantChange, notified });
+  res.json({ event: ev, importantChange, notified, uninvited, announced });
 });
 
 adminRouter.delete('/events/:id', (req, res) => {

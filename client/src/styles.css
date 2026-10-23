@@ -244,3 +244,8 @@ table.list select { min-height: 34px; padding: 4px 8px; font-size: 14px; width: 
 }
 
 table.list td:first-child { min-width: 140px; }
+
+.invite-picker { border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.voice-group { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 6px; }
+.voice-head { margin-bottom: 4px; }
+.voice-member { padding-left: 28px; margin-bottom: 6px; font-size: 15px; }

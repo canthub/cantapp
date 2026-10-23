@@ -4,7 +4,7 @@ import { config, emailEnabled, pushEnabled } from '../config.js';
 import {
   SESSION_COOKIE, createLoginCode, verifyLoginCode, createSession, destroySession, requireMember,
 } from '../auth.js';
-import { getMemberByEmail, getEventRow, serializeEvent, isEligible, getResponse, listEvents } from '../models.js';
+import { getMemberByEmail, getEventRow, getEvent, serializeEvent, isEligible, getResponse, listEvents } from '../models.js';
 import { setResponse, concertRuleAllows, concertRuleMessage } from '../services/rsvp.js';
 import { saveSubscription, removeSubscription } from '../services/push.js';
 import { sendMail, emailLayout, esc } from '../services/mailer.js';
@@ -57,15 +57,18 @@ memberRouter.get('/me', requireMember, (req, res) => {
 
 function memberView(row, memberId, now = new Date()) {
   const ev = serializeEvent(row, now);
+  // Mindenki látja a kórusa eseményeit, de visszajelezni csak a meghívottak tudnak.
+  ev.invited = isEligible(row.id, memberId);
   ev.myResponse = getResponse(row.id, memberId)?.status || null;
-  ev.allowed = { yes: ev.isOpen, maybe: ev.isOpen, no: ev.isOpen };
+  const canRespond = ev.isOpen && ev.invited;
+  ev.allowed = { yes: canRespond, maybe: canRespond, no: canRespond };
   if (row.type === 'koncert' && row.dress_rehearsal_id) {
     const dr = getEventRow(row.dress_rehearsal_id);
-    if (dr) {
+    if (dr && isEligible(dr.id, memberId)) {
       const drStatus = getResponse(dr.id, memberId)?.status || null;
       ev.dressRehearsal = { id: dr.id, name: dr.name, date: dr.date, startTime: dr.start_time, myResponse: drStatus };
-      ev.allowed.yes = ev.isOpen && concertRuleAllows('yes', drStatus);
-      ev.allowed.maybe = ev.isOpen && concertRuleAllows('maybe', drStatus);
+      ev.allowed.yes = canRespond && concertRuleAllows('yes', drStatus);
+      ev.allowed.maybe = canRespond && concertRuleAllows('maybe', drStatus);
       if (!ev.allowed.yes) ev.ruleMessage = concertRuleMessage(dr);
     }
   }
@@ -80,7 +83,8 @@ memberRouter.get('/events', requireMember, (req, res) => {
 
 memberRouter.get('/events/:id', requireMember, (req, res) => {
   const row = getEventRow(Number(req.params.id));
-  const visible = row && (row.status !== 'draft' || req.member.isAdmin) && (isEligible(row.id, req.member.id) || req.member.isAdmin);
+  const ownChoir = row && getEvent(row.id).choirs.some((c) => req.member.choirs.includes(c));
+  const visible = row && (row.status !== 'draft' || req.member.isAdmin) && (ownChoir || req.member.isAdmin);
   if (!visible) return res.status(404).json({ error: 'Az esemény nem található.' });
   res.json({ event: memberView(row, req.member.id) });
 });

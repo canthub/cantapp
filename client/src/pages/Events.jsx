@@ -8,7 +8,7 @@ import { timeRange, todayIso, choirNames } from '../util.js';
 export function EventCard({ ev, showChoirs }) {
   const place = [ev.venue, ev.city].filter(Boolean).join(', ');
   return (
-    <div className={`card clickable event-card ${!ev.isOpen && ev.status !== 'draft' ? 'muted' : ''}`} onClick={() => navigate(`/esemeny/${ev.id}`)}>
+    <div className={`card clickable event-card ${(!ev.isOpen && ev.status !== 'draft') || ev.invited === false ? 'muted' : ''}`} onClick={() => navigate(`/esemeny/${ev.id}`)}>
       <DateBox date={ev.date} />
       <div className="body">
         <div className="title">{ev.name}</div>
@@ -36,7 +36,7 @@ export default function Events({ me }) {
   else {
     const today = todayIso();
     let events = data.events.filter((e) => (choir === 'all' ? true : e.choirs.includes(choir)));
-    const todo = events.filter((e) => e.isOpen && !e.myResponse);
+    const todo = events.filter((e) => e.isOpen && e.invited && !e.myResponse);
     if (tab === 'upcoming') events = events.filter((e) => e.date >= today);
     else if (tab === 'todo') events = todo;
     else events = events.filter((e) => e.date < today).reverse();

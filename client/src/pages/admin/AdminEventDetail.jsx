@@ -116,6 +116,7 @@ export default function AdminEventDetail({ id }) {
           <div className="row"><span className="ico">📅</span><div>{formatDate(ev.date)}{timeRange(ev) && <>, <b>{timeRange(ev)}</b></>}</div></div>
           <div className="row"><span className="ico">📍</span><div>{placeText(ev) || '–'}{ev.mapsUrl && <> · <a href={ev.mapsUrl} target="_blank" rel="noreferrer">Térkép</a></>}</div></div>
           <div className="row"><span className="ico">⏰</span><div>Határidő: <Deadline ev={ev} /></div></div>
+          <div className="row"><span className="ico">👥</span><div>Meghívottak: {ev.inviteMode === 'selected' ? <b>csak kijelölt tagok ({summary.total} fő)</b> : 'a kórus(ok) minden tagja'}</div></div>
           {ev.dressRehearsalId && <div className="row"><span className="ico">🎼</span><div>Kapcsolódó főpróba: <a href={`#/admin/esemeny/${ev.dressRehearsalId}`}>megnyitás</a></div></div>}
           {concerts.length > 0 && <div className="row"><span className="ico">🎤</span><div>Ehhez a főpróbához tartozó koncert: {concerts.map((c) => <a key={c.id} href={`#/admin/esemeny/${c.id}`} style={{ marginRight: 8 }}>{c.name}</a>)}</div></div>}
           {ev.notes && <div className="row"><span className="ico">📝</span><div style={{ whiteSpace: 'pre-wrap' }}>{ev.notes}</div></div>}

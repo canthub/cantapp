@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { getEvent, eligibleMembers, responsesByMember, fullName, reportRecipients } from '../models.js';
 import { getDb } from '../db.js';
-import { CHOIRS, RESPONSE_REPORT_LABELS, EVENT_STATUSES } from '../../shared/constants.js';
+import { CHOIRS, RESPONSE_REPORT_LABELS, EVENT_STATUSES, compareVoices } from '../../shared/constants.js';
 import { formatDateHu, formatIsoHu } from './time.js';
 import { sendMail, emailLayout, esc } from './mailer.js';
 
@@ -29,10 +29,12 @@ export function buildReport(eventId, now = new Date()) {
     };
   });
   rows.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-    || a.voicePart.localeCompare(b.voicePart, 'hu') || a.name.localeCompare(b.name, 'hu'));
+    || compareVoices(a.voicePart, b.voicePart) || a.name.localeCompare(b.name, 'hu'));
 
   const summary = { total: rows.length, yes: 0, maybe: 0, no: 0, none: 0 };
   const byVoice = {};
+  // A szólamonkénti összesítő a szokásos szólamsorrendben (S, A, T, B).
+  for (const v of [...new Set(rows.map((r) => r.voicePart || 'Nincs megadva'))].sort(compareVoices)) byVoice[v] = { yes: 0, maybe: 0, no: 0, none: 0 };
   for (const r of rows) {
     summary[r.status]++;
     const v = r.voicePart || 'Nincs megadva';

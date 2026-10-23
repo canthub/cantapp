@@ -4,7 +4,7 @@ import { sendPushToMember } from './push.js';
 
 // Egy üzenet kiküldése tagoknak: alkalmazáson belüli értesítés + push + (opcionálisan) e-mail.
 // Egy tag kézbesítési hibája nem állítja le a többiekét.
-export async function notifyMembers(memberIds, { kind, eventId = null, title, body, url = '/', email = true, emailHtml = null, now = new Date() }) {
+export async function notifyMembers(memberIds, { kind, eventId = null, title, body, url = '/', email = true, greeting: withGreeting = true, emailHtml = null, now = new Date() }) {
   const db = getDb();
   const insert = db.prepare('INSERT INTO notifications (member_id, event_id, kind, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)');
   const getMember = db.prepare('SELECT * FROM members WHERE id = ?');
@@ -20,15 +20,15 @@ export async function notifyMembers(memberIds, { kind, eventId = null, title, bo
       console.error('Push hiba:', err.message);
     }
     if (email) {
-      const greeting = member.first_name ? `Kedves ${member.first_name}!` : 'Kedves Kórustag!';
+      const greeting = !withGreeting ? '' : member.first_name ? `Kedves ${member.first_name}!` : 'Kedves Kórustag!';
       try {
         await sendMail({
           to: member.email,
           subject: title,
-          text: `${greeting}\n\n${body}\n\n${absoluteUrl(url)}`,
+          text: `${greeting ? `${greeting}\n\n` : ''}${body}\n\n${absoluteUrl(url)}`,
           html: emailLayout({
             heading: title,
-            bodyHtml: `<p style="margin:0 0 12px">${esc(greeting)}</p><p style="margin:0 0 12px;line-height:1.5">${esc(body)}</p>${emailHtml || ''}`,
+            bodyHtml: `${greeting ? `<p style="margin:0 0 12px">${esc(greeting)}</p>` : ''}<p style="margin:0 0 12px;line-height:1.5">${esc(body)}</p>${emailHtml || ''}`,
             button: { label: 'Megnyitás az alkalmazásban', url: absoluteUrl(url) },
           }),
         });

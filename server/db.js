@@ -132,6 +132,13 @@ const MIGRATIONS = [
   `ALTER TABLE events ADD COLUMN external_data TEXT;`,
   // Melyik naptárból jött az esemény – a naptárból törölt események felismeréséhez.
   `ALTER TABLE events ADD COLUMN external_source TEXT;`,
+  // Meghívottak: 'all' = a kórus(ok) minden tagja, 'selected' = csak az event_invites-ban szereplők.
+  `ALTER TABLE events ADD COLUMN invite_mode TEXT NOT NULL DEFAULT 'all';
+  CREATE TABLE event_invites (
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    PRIMARY KEY (event_id, member_id)
+  );`,
 ];
 
 export function openDb(file) {

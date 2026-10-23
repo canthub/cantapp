@@ -15,6 +15,12 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 - Visszajelzéskor üzenet: *„Köszönjük, hogy visszajeleztél nekünk! 🙂”*.
 - A határidő után az esemény lezárul: látható marad, de már nem jelölhető.
 
+**Meghívottak eseményenként**
+- Alapértelmezésben a kiválasztott kórus(ok) minden tagja meg van hívva. Az eseménynél választható a *„Csak a kijelölt tagok”* lehetőség is: ilyenkor a tagok **szólamonként csoportosítva** jelennek meg (Szoprán → Alt → Tenor → Basszus, egész szólam egy kattintással kijelölhető), és a meghívotti lista másik eseményről (pl. a főpróbáról) át is másolható.
+- Az eseményt a kórus minden tagja látja, de értesítést, emlékeztetőt csak a meghívottak kapnak, és csak ők jelezhetnek vissza. A riportban is csak ők szerepelnek.
+- Aki közzététel után kikerül a meghívottak közül, ezt az üzenetet kapja (appban, push-ként és e-mailben): *„Kedves Kórustag!, A megbeszéltek szerint most erre az eseményre mégsem kell jönnöd!”*. A visszajelzése törlődik. Akit közzététel után vesznek fel a listára, megkapja az eseményről szóló értesítést.
+- A koncert–főpróba szabály csak azokra vonatkozik, akik a főpróbára is meg vannak hívva.
+
 **Automatikus értesítések** (az appban, push értesítésként a telefonon és e-mailben):
 
 | Mikor | Kinek | Mit |

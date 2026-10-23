@@ -64,7 +64,11 @@ export default function EventDetail({ id, onChange }) {
           </div>
         )}
 
-        {event.status !== 'cancelled' && (
+        {event.status !== 'cancelled' && !event.invited && (
+          <div className="notice info">Ezt az eseményt látod, de most nem vagy rá meghívva, ezért nem kell visszajelezned.</div>
+        )}
+
+        {event.status !== 'cancelled' && event.invited && (
           <div className="card">
             <h2>Részt tudsz venni?</h2>
             {!event.isOpen && <div className="notice warn">A visszajelzési határidő lejárt, az esemény már nem jelölhető.</div>}
