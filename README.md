@@ -59,14 +59,14 @@ Az Excel-sablonok második munkalapján kitöltési útmutató található.
 
 ## Üzembe helyezés
 
-> **Railway-re telepítés lépésről lépésre: [RAILWAY.md](RAILWAY.md)**
+> **Renderre telepítés lépésről lépésre: [RENDER.md](RENDER.md)**
 
 Más tárhelyen: egy állandóan futó szerver kell Node.js 22.13+ verzióval (vagy Dockerrel), egy domain HTTPS-sel (a push értesítésekhez kötelező), valamint e-mail-küldés (SMTP, vagy Brevo/Resend API).
 
 1. **Beállítások:** másold a `.env.example` fájlt `.env` néven, és töltsd ki:
    - `APP_URL`: az app címe, pl. `https://korus.cantemus.hu`
    - `ADMIN_EMAILS`: kik legyenek adminok (ezekkel a címekkel lehet először belépni)
-   - e-mail: vagy `SMTP_*` (a levelezőszerver adatai), vagy `EMAIL_PROVIDER=brevo|resend` + `EMAIL_API_KEY` (ahol az SMTP le van tiltva, pl. a Railway Hobby csomagján)
+   - e-mail: vagy `SMTP_*` (a levelezőszerver adatai), vagy `EMAIL_PROVIDER=brevo|resend` + `EMAIL_API_KEY` (ajánlott; ott is működik, ahol az SMTP tiltva van)
    - `VAPID_*` (nem kötelező): ha nincs megadva, az app első induláskor generál egy kulcspárt, és az adatbázisban tárolja
 2. **Indítás Dockerrel:**
    ```bash
@@ -79,7 +79,7 @@ Más tárhelyen: egy állandóan futó szerver kell Node.js 22.13+ verzióval (v
    npm run build
    npm start
    ```
-3. Tegyél elé egy HTTPS-t adó reverse proxyt (pl. Caddy vagy Nginx), vagy használj olyan tárhelyet, amely ezt megoldja (pl. Fly.io, Railway, Render tartós lemezzel).
+3. Tegyél elé egy HTTPS-t adó reverse proxyt (pl. Caddy vagy Nginx), vagy használj olyan tárhelyet, amely ezt megoldja (pl. Render tartós lemezzel).
 4. Lépj be adminként, importáld a tagokat, majd hozd létre vagy importáld az eseményeket.
 
 Az adatok egyetlen SQLite-fájlban vannak (`DB_PATH`, Dockerben `/data/cantapp.db`). **Ezt a fájlt rendszeresen menteni kell.**

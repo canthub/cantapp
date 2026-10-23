@@ -24,7 +24,7 @@ export function createApp() {
     next();
   });
 
-  // Állapotellenőrzés a tárhelynek (pl. Railway healthcheck).
+  // Állapotellenőrzés a tárhelynek (pl. a Render health check).
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.use('/api/admin', requireAdmin, adminRouter);
   app.use('/api', memberRouter);

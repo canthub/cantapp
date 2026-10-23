@@ -1,0 +1,27 @@
+# Render Blueprint – a Render a repóból ez alapján hozza létre a szolgáltatást (lásd RENDER.md).
+services:
+  - type: web
+    name: cantapp
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # A tartós tárolóhoz fizetős csomag kell; egy kórusnyi forgalomhoz a legkisebb elég.
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /api/health
+    # Az adatbázis itt van; frissítés és újraindítás után is megmarad. A tároló miatt csak egy példány futhat.
+    disk:
+      name: cantapp-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: EMAIL_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: GEOCODER_CONTACT
+        sync: false
+      # APP_URL-t csak saját domainnél kell megadni – addig a Render által adott címet használjuk.
