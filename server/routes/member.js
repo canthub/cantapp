@@ -8,6 +8,7 @@ import { getMemberByEmail, getEventRow, getEvent, serializeEvent, isEligible, ge
 import { setResponse, concertRuleAllows, concertRuleMessage } from '../services/rsvp.js';
 import { saveSubscription, removeSubscription } from '../services/push.js';
 import { sendMail, emailLayout, esc } from '../services/mailer.js';
+import { getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar } from '../services/calendarFeed.js';
 
 export const memberRouter = Router();
 
@@ -107,6 +108,26 @@ memberRouter.get('/notifications', requireMember, (req, res) => {
 memberRouter.post('/notifications/read-all', requireMember, (req, res) => {
   getDb().prepare('UPDATE notifications SET read_at = ? WHERE member_id = ? AND read_at IS NULL').run(nowIso(), req.member.id);
   res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------- Naptár-feliratkozás
+
+// A naptárprogramok bejelentkezés nélkül töltik le, ezért a titkos kulcs maga a jogosultság.
+memberRouter.get('/calendar/:file', (req, res) => {
+  const member = memberByCalendarToken(String(req.params.file).replace(/\.ics$/, ''));
+  if (!member) return res.status(404).type('text/plain').send('Ez a naptárlink nem érvényes. Kérj újat az appban: Profil → Naptár.');
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', 'inline; filename="cantemus-korus.ics"');
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.send(buildMemberCalendar(member.id));
+});
+
+memberRouter.get('/calendar-link', requireMember, (req, res) => {
+  res.json(calendarUrls(getCalendarToken(req.member.id)));
+});
+
+memberRouter.post('/calendar-link/reset', requireMember, (req, res) => {
+  res.json(calendarUrls(getCalendarToken(req.member.id, { reset: true })));
 });
 
 // ---------------------------------------------------------------- Push

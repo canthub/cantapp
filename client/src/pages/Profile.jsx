@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, toast } from '../api.js';
 import { TopBar } from '../components/ui.jsx';
+import CalendarCard from '../components/CalendarCard.jsx';
 import { pushSupported, currentSubscription, enablePush, disablePush } from '../push.js';
 import { choirNames, isIos, isStandalone } from '../util.js';
 
@@ -72,6 +73,8 @@ export default function Profile({ me }) {
             </button>
           )}
         </div>
+
+        <CalendarCard />
 
         {!isStandalone() && (
           <div className="card">
