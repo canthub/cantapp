@@ -151,6 +151,9 @@ const MIGRATIONS = [
     lng REAL,
     created_at TEXT NOT NULL
   );`,
+  // Személyes naptár-feliratkozás titkos kulcsa (a link: /api/calendar/<kulcs>.ics).
+  `ALTER TABLE members ADD COLUMN calendar_token TEXT;
+  CREATE UNIQUE INDEX members_calendar_token ON members(calendar_token);`,
 ];
 
 export function openDb(file) {

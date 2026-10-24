@@ -14,6 +14,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 - **Koncertre csak az jelölhet részvételt, aki a hozzá tartozó főpróbára is jelölt.** Ha valaki később a főpróbát „nem”-re állítja, a koncertre adott „igen”/„talán” válasza törlődik, és erről üzenetet kap.
 - Visszajelzéskor üzenet: *„Köszönjük, hogy visszajeleztél nekünk! 🙂”*.
 - A határidő után az esemény lezárul: látható marad, de már nem jelölhető.
+- **Saját naptár-feliratkozás** (*Profil → Események a saját naptáradban*): személyes, titkos naptárlink iPhone/Mac, Google és Outlook naptárhoz. Minden esemény megjelenik benne, amelyre a tag meg van hívva, a válasz jelével a címben: ✅ részt veszek, ❓ talán, ❌ nem, ⏳ még nem jelzett vissza. A módosítások és a lemondások is frissülnek, a naptár saját frissítési ütemében (óránként–naponta). A link a Profil oldalon újragenerálható, ekkor a régi megszűnik.
 
 **Meghívottak eseményenként**
 - Alapértelmezésben a kiválasztott kórus(ok) minden tagja meg van hívva. Az eseménynél választható a *„Csak a kijelölt tagok”* lehetőség is: ilyenkor a tagok **szólamonként csoportosítva** jelennek meg (Szoprán → Alt → Tenor → Basszus, egész szólam egy kattintással kijelölhető), és a meghívotti lista másik eseményről (pl. a főpróbáról) át is másolható.
