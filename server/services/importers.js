@@ -193,6 +193,7 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
           date,
           startTime: parseTime(pick(row, 'Kezdés', 'Időpont', 'Kezdési idő', 'Kezdés időpontja')),
           endTime: parseTime(pick(row, 'Befejezés', 'Vége')),
+          endDate: pick(row, 'Utolsó nap', 'Befejezés dátuma', 'Záró dátum') ? parseDate(pick(row, 'Utolsó nap', 'Befejezés dátuma', 'Záró dátum')) : '',
           country: pick(row, 'Ország'),
           city: pick(row, 'Város', 'Település'),
           address: pick(row, 'Cím', 'Utca, házszám'),
@@ -201,6 +202,8 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
           deadlineDate: deadlineCell ? parseDate(deadlineCell) : (date ? defaultDeadlineDate(parseDate(date), deadlineDaysBefore) : ''),
           notes: pick(row, 'Megjegyzés', 'Leírás'),
           choirs,
+          // Üresen hagyva: ha lehetséges (Nyíregyházán kívüli, több napos esemény), engedélyezett.
+          accommodation: pick(row, 'Szálláskérés', 'Szállás') ? parseBool(pick(row, 'Szálláskérés', 'Szállás')) : true,
         };
         const e = normalizeEventInput(input);
         const label = `„${e.name}” (${e.date}${e.startTime ? ` ${e.startTime}` : ''})`;
@@ -245,7 +248,7 @@ const paramText = (v) => (v && typeof v === 'object' && 'val' in v ? String(v.va
 
 // Naptárból szinkronizált mezők. Újraimportáláskor csak az íródik felül, ami a naptárban változott
 // az előző import óta – így az appban kézzel pontosított adatok (pl. épület, típus, határidő) megmaradnak.
-const SYNC_FIELDS = ['name', 'date', 'startTime', 'endTime', 'address', 'notes'];
+const SYNC_FIELDS = ['name', 'date', 'endDate', 'startTime', 'endTime', 'address', 'notes'];
 
 // Stabil azonosító: egyszeri eseménynél a naptári UID, ismétlődőnél UID + az alkalom eredeti napja.
 // Így az áthelyezett (vagy időpontot váltó) alkalom a meglévő eseményt frissíti, nem újat hoz létre.
@@ -258,9 +261,17 @@ function instanceUid(inst) {
 function calendarValues(inst) {
   const start = DateTime.fromJSDate(inst.start).setZone(TZ);
   const end = inst.end ? DateTime.fromJSDate(inst.end).setZone(TZ) : null;
+  const date = inst.isFullDay ? DateTime.fromJSDate(inst.start, { zone: 'utc' }).toISODate() : start.toISODate();
+  // Az egész napos esemény vége a naptárban kizárólagos (a következő nap), ezért egy napot visszalépünk.
+  let endDate = '';
+  if (end) {
+    const last = inst.isFullDay ? DateTime.fromJSDate(inst.end, { zone: 'utc' }).minus({ days: 1 }).toISODate() : end.toISODate();
+    if (last > date) endDate = last;
+  }
   return {
     name: paramText(inst.summary) || 'Névtelen esemény',
-    date: inst.isFullDay ? DateTime.fromJSDate(inst.start, { zone: 'utc' }).toISODate() : start.toISODate(),
+    date,
+    endDate,
     startTime: inst.isFullDay ? '' : start.toFormat('HH:mm'),
     endTime: inst.isFullDay || !end ? '' : end.toFormat('HH:mm'),
     address: paramText(inst.event.location),
@@ -288,7 +299,7 @@ function syncFromCalendar(row, cal) {
   return { changed: Object.keys(changes), importantChange };
 }
 
-const FIELD_LABELS = { name: 'név', date: 'dátum', startTime: 'kezdés', endTime: 'befejezés', address: 'helyszín', notes: 'leírás' };
+const FIELD_LABELS = { name: 'név', date: 'dátum', endDate: 'utolsó nap', startTime: 'kezdés', endTime: 'befejezés', address: 'helyszín', notes: 'leírás' };
 
 const isCancelled = (inst) => inst.event.status === 'CANCELLED';
 

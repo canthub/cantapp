@@ -29,13 +29,13 @@ const templates = {
   },
   esemenyek_import_sablon: {
     sheet: 'Események',
-    headers: ['Esemény neve', 'Dátum', 'Kezdés', 'Befejezés', 'Típus', 'Énekkar', 'Turné', 'Ország', 'Város', 'Cím', 'Épület', 'Visszajelzési határidő', 'Megjegyzés'],
-    widths: [28, 12, 9, 10, 10, 20, 8, 12, 14, 26, 24, 22, 30],
+    headers: ['Esemény neve', 'Dátum', 'Utolsó nap', 'Kezdés', 'Befejezés', 'Típus', 'Énekkar', 'Turné', 'Szálláskérés', 'Ország', 'Város', 'Cím', 'Épület', 'Visszajelzési határidő', 'Megjegyzés'],
+    widths: [28, 12, 12, 9, 10, 10, 20, 8, 13, 12, 14, 26, 24, 22, 30],
     rows: [
-      ['Heti próba', '2026-11-03', '18:00', '21:00', 'próba', 'Cantemus', 'nem', 'Magyarország', 'Nyíregyháza', 'Példa utca 1.', 'Iskola, kórusterem', '2026-10-31', ''],
-      ['Adventi koncert – főpróba', '2026-12-05', '15:00', '18:00', 'főpróba', 'mindkettő', 'nem', 'Magyarország', 'Nyíregyháza', 'Példa tér 2.', 'Példa hangversenyterem', '2026-11-25', ''],
-      ['Adventi koncert', '2026-12-06', '19:00', '', 'koncert', 'mindkettő', 'nem', 'Magyarország', 'Nyíregyháza', 'Példa tér 2.', 'Példa hangversenyterem', '2026-11-25', 'Fellépő ruha: fekete'],
-      ['Indulás Bécsbe', '2027-03-12', '07:00', '', 'utazás', 'Pro Musica', 'igen', 'Magyarország', 'Nyíregyháza', 'Példa utca 1.', 'Iskola, parkoló', '2027-02-20', 'Útlevél kötelező!'],
+      ['Heti próba', '2026-11-03', '', '18:00', '21:00', 'próba', 'Cantemus', 'nem', '', 'Magyarország', 'Nyíregyháza', 'Példa utca 1.', 'Iskola, kórusterem', '2026-10-31', ''],
+      ['Adventi koncert – főpróba', '2026-12-05', '', '15:00', '18:00', 'főpróba', 'mindkettő', 'nem', '', 'Magyarország', 'Nyíregyháza', 'Példa tér 2.', 'Példa hangversenyterem', '2026-11-25', ''],
+      ['Adventi koncert', '2026-12-06', '', '19:00', '', 'koncert', 'mindkettő', 'nem', '', 'Magyarország', 'Nyíregyháza', 'Példa tér 2.', 'Példa hangversenyterem', '2026-11-25', 'Fellépő ruha: fekete'],
+      ['Bécsi turné', '2027-03-12', '2027-03-15', '07:00', '20:00', 'utazás', 'Pro Musica', 'igen', 'igen', 'Ausztria', 'Bécs', 'Példa utca 1.', 'Példa hangversenyterem', '2027-02-20', 'Útlevél kötelező!'],
     ],
     help: [
       'Kitöltési útmutató',
@@ -44,6 +44,8 @@ const templates = {
       'Típus: próba, főpróba, koncert vagy utazás.',
       'Énekkar: Cantemus, Pro Musica vagy mindkettő.',
       'Turné: „igen”, ha az esemény koncertturné része.',
+      'Utolsó nap: csak több napos eseménynél kell kitölteni (ÉÉÉÉ-HH-NN).',
+      'Szálláskérés: „igen” vagy „nem” – a tagok kérhetnek-e szállást. Csak Nyíregyházán kívüli, több napos eseménynél lehetséges; üresen hagyva ilyenkor automatikusan engedélyezett.',
       'Visszajelzési határidő: ha üresen hagyod, az import ablakban megadott számú nappal az esemény előtt lesz.',
       'A koncertek automatikusan a legközelebbi (14 napon belüli) főpróbához kapcsolódnak – ez az appban módosítható.',
       'Az importált események piszkozatként jönnek létre: ellenőrzés után az appban kell közzétenni őket.',

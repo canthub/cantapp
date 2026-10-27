@@ -60,7 +60,9 @@ function memberView(row, memberId, now = new Date()) {
   const ev = serializeEvent(row, now);
   // Mindenki látja a kórusa eseményeit, de visszajelezni csak a meghívottak tudnak.
   ev.invited = isEligible(row.id, memberId);
-  ev.myResponse = getResponse(row.id, memberId)?.status || null;
+  const response = getResponse(row.id, memberId);
+  ev.myResponse = response?.status || null;
+  ev.myAccommodation = Boolean(response?.accommodation);
   const canRespond = ev.isOpen && ev.invited;
   ev.allowed = { yes: canRespond, maybe: canRespond, no: canRespond };
   if (row.type === 'koncert' && row.dress_rehearsal_id) {
@@ -92,7 +94,7 @@ memberRouter.get('/events/:id', requireMember, (req, res) => {
 
 memberRouter.put('/events/:id/response', requireMember, async (req, res) => {
   const id = Number(req.params.id);
-  const result = await setResponse(id, req.member.id, req.body?.status);
+  const result = await setResponse(id, req.member.id, req.body?.status, { accommodation: req.body?.accommodation });
   res.json({ ...result, event: memberView(getEventRow(id), req.member.id) });
 });
 

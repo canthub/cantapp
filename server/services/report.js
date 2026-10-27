@@ -26,12 +26,13 @@ export function buildReport(eventId, now = new Date()) {
       statusLabel: RESPONSE_REPORT_LABELS[status],
       respondedAt: r ? r.updated_at : null,
       setByAdmin: Boolean(r?.set_by_admin),
+      accommodation: event.accommodation && Boolean(r?.accommodation),
     };
   });
   rows.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
     || compareVoices(a.voicePart, b.voicePart) || a.name.localeCompare(b.name, 'hu'));
 
-  const summary = { total: rows.length, yes: 0, maybe: 0, no: 0, none: 0 };
+  const summary = { total: rows.length, yes: 0, maybe: 0, no: 0, none: 0, accommodation: rows.filter((r) => r.accommodation).length };
   const byVoice = {};
   // A szólamonkénti összesítő a szokásos szólamsorrendben (S, A, T, B).
   for (const v of [...new Set(rows.map((r) => r.voicePart || 'Nincs megadva'))].sort(compareVoices)) byVoice[v] = { yes: 0, maybe: 0, no: 0, none: 0 };
@@ -50,17 +51,24 @@ function eventInfoLines(ev) {
     ['Esemény', ev.name],
     ['Típus', ev.typeLabel + (ev.isTour ? ' (koncertturné)' : '')],
     ['Énekkar', ev.choirs.map((c) => CHOIRS[c]).join(', ')],
-    ['Időpont', formatDateHu(ev.date, time)],
+    ['Időpont', ev.endDate ? `${formatDateHu(ev.date, ev.startTime)} – ${formatDateHu(ev.endDate, ev.endTime)}` : formatDateHu(ev.date, time)],
     ['Helyszín', [ev.venue, ev.address, ev.city, ev.country].filter(Boolean).join(', ') || '–'],
     ['Visszajelzési határidő', formatIsoHu(ev.deadlineAt)],
     ['Állapot', ev.isOpen ? 'Visszajelzés folyamatban' : EVENT_STATUSES[ev.status] + (ev.status === 'published' ? ' – lezárva' : '')],
   ];
 }
 
-const summaryLine = (s) => `Részt vesz: ${s.yes} · Talán: ${s.maybe} · Nem vesz részt: ${s.no} · Nem jelzett vissza: ${s.none} · Összesen: ${s.total}`;
+const summaryLine = (report) => {
+  const s = report.summary;
+  const room = report.event.accommodation ? ` · Szállást kér: ${s.accommodation}` : '';
+  return `Részt vesz: ${s.yes} · Talán: ${s.maybe} · Nem vesz részt: ${s.no} · Nem jelzett vissza: ${s.none} · Összesen: ${s.total}${room}`;
+};
 
-const TABLE_HEADERS = ['Név', 'Szólam', 'Énekkar', 'E-mail', 'Telefon', 'Visszajelzés', 'Visszajelzés ideje'];
-const rowValues = (r) => [r.name, r.voicePart, r.choirs, r.email, r.phone, r.statusLabel + (r.setByAdmin ? ' (admin rögzítette)' : ''), r.respondedAt ? formatIsoHu(r.respondedAt) : ''];
+// A „Szállást kér” oszlop csak akkor szerepel, ha az eseménynél engedélyezett a szálláskérés.
+const tableHeaders = (report) => ['Név', 'Szólam', 'Énekkar', 'E-mail', 'Telefon', 'Visszajelzés', 'Visszajelzés ideje',
+  ...(report.event.accommodation ? ['Szállást kér'] : [])];
+const rowValues = (report) => (r) => [r.name, r.voicePart, r.choirs, r.email, r.phone, r.statusLabel + (r.setByAdmin ? ' (admin rögzítette)' : ''),
+  r.respondedAt ? formatIsoHu(r.respondedAt) : '', ...(report.event.accommodation ? [r.accommodation ? 'igen' : ''] : [])];
 
 export async function reportXlsx(report) {
   const wb = new ExcelJS.Workbook();
@@ -70,24 +78,24 @@ export async function reportXlsx(report) {
     const row = ws.addRow([k, v]);
     row.getCell(1).font = { bold: true };
   }
-  ws.addRow(['Összesítés', summaryLine(report.summary)]).getCell(1).font = { bold: true };
+  ws.addRow(['Összesítés', summaryLine(report)]).getCell(1).font = { bold: true };
   ws.addRow(['Riport készült', formatIsoHu(report.generatedAt)]).getCell(1).font = { bold: true };
   ws.addRow([]);
-  const header = ws.addRow(TABLE_HEADERS);
+  const header = ws.addRow(tableHeaders(report));
   header.eachCell((c) => {
     c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7A1F2B' } };
   });
   const colors = { yes: 'FFD9F2DC', maybe: 'FFFFF2CC', no: 'FFF8D7DA', none: 'FFEDEDED' };
   for (const r of report.rows) {
-    const row = ws.addRow(rowValues(r));
+    const row = ws.addRow(rowValues(report)(r));
     row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors[r.status] } };
   }
   ws.addRow([]);
   ws.addRow(['Szólamonként']).getCell(1).font = { bold: true };
   ws.addRow(['Szólam', 'Részt vesz', 'Talán', 'Nem vesz részt', 'Nem jelzett vissza']).font = { bold: true };
   for (const [voice, c] of Object.entries(report.byVoice)) ws.addRow([voice, c.yes, c.maybe, c.no, c.none]);
-  [26, 14, 30, 32, 16, 28, 28].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  [26, 14, 30, 32, 16, 28, 28, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -96,7 +104,7 @@ export function reportCsv(report) {
     const s = String(v ?? '');
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const lines = [TABLE_HEADERS, ...report.rows.map(rowValues)].map((r) => r.map(cell).join(';'));
+  const lines = [tableHeaders(report), ...report.rows.map(rowValues(report))].map((r) => r.map(cell).join(';'));
   // BOM + pontosvessző: így a magyar Excel helyesen nyitja meg.
   return `﻿${lines.join('\r\n')}\r\n`;
 }
@@ -104,11 +112,11 @@ export function reportCsv(report) {
 export function reportHtmlTable(report) {
   const bg = { yes: '#d9f2dc', maybe: '#fff2cc', no: '#f8d7da', none: '#ededed' };
   const info = eventInfoLines(report.event).map(([k, v]) => `<tr><th style="text-align:left;padding:3px 12px 3px 0;color:#555">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('');
-  const head = TABLE_HEADERS.map((h) => `<th style="text-align:left;padding:6px;background:#7a1f2b;color:#fff">${esc(h)}</th>`).join('');
-  const body = report.rows.map((r) => `<tr>${rowValues(r).map((v, i) => `<td style="padding:6px;border-bottom:1px solid #ddd;${i === 5 ? `background:${bg[r.status]}` : ''}">${esc(v)}</td>`).join('')}</tr>`).join('');
+  const head = tableHeaders(report).map((h) => `<th style="text-align:left;padding:6px;background:#7a1f2b;color:#fff">${esc(h)}</th>`).join('');
+  const body = report.rows.map((r) => `<tr>${rowValues(report)(r).map((v, i) => `<td style="padding:6px;border-bottom:1px solid #ddd;${i === 5 ? `background:${bg[r.status]}` : ''}">${esc(v)}</td>`).join('')}</tr>`).join('');
   const voices = Object.entries(report.byVoice).map(([v, c]) => `<tr><td style="padding:4px 8px">${esc(v)}</td><td style="padding:4px 8px">${c.yes}</td><td style="padding:4px 8px">${c.maybe}</td><td style="padding:4px 8px">${c.no}</td><td style="padding:4px 8px">${c.none}</td></tr>`).join('');
   return `<table style="border-collapse:collapse;font-size:14px;margin-bottom:12px">${info}</table>
-  <p style="font-weight:bold">${esc(summaryLine(report.summary))}</p>
+  <p style="font-weight:bold">${esc(summaryLine(report))}</p>
   <table style="border-collapse:collapse;font-size:13px;width:100%"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
   <h3 style="margin-top:20px">Szólamonként</h3>
   <table style="border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:4px 8px">Szólam</th><th style="padding:4px 8px">Részt vesz</th><th style="padding:4px 8px">Talán</th><th style="padding:4px 8px">Nem vesz részt</th><th style="padding:4px 8px">Nem jelzett vissza</th></tr></thead><tbody>${voices}</tbody></table>`;
@@ -136,7 +144,7 @@ export async function emailReport(eventId, recipients = reportRecipients(), now 
   await sendMail({
     to: recipients,
     subject,
-    text: `${ev.name} – ${summaryLine(report.summary)}\nA részletes táblázat a csatolt Excel-fájlban található.`,
+    text: `${ev.name} – ${summaryLine(report)}\nA részletes táblázat a csatolt Excel-fájlban található.`,
     html: emailLayout({ heading: subject, bodyHtml: reportHtmlTable(report) }),
     attachments: [
       { filename: `${fileBase(ev)}.xlsx`, content: await reportXlsx(report) },

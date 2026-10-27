@@ -10,12 +10,13 @@ export default function EventDetail({ id, onChange }) {
   const [busy, setBusy] = useState(false);
   const event = ev?.id === Number(id) ? ev : data?.event;
 
-  const respond = async (status) => {
+  const respond = async (status, accommodation) => {
     setBusy(true);
     try {
-      const res = await api(`/events/${id}/response`, { method: 'PUT', body: { status } });
+      const res = await api(`/events/${id}/response`, { method: 'PUT', body: { status, accommodation } });
       setEv(res.event);
-      toast(res.first ? THANK_YOU_MESSAGE : 'Visszajelzésedet módosítottuk.');
+      if (accommodation !== undefined) toast(accommodation ? 'Szálláskérésedet rögzítettük. 🛏️' : 'Szálláskérésedet töröltük.');
+      else toast(res.first ? THANK_YOU_MESSAGE : 'Visszajelzésedet módosítottuk.');
       if (res.removedConcerts?.length) toast('A kapcsolódó koncertre adott visszajelzésedet töröltük, mert a főpróbára nem jelöltél részvételt.', 'err');
       onChange?.();
     } catch (err) {
@@ -36,13 +37,16 @@ export default function EventDetail({ id, onChange }) {
         <div className="badges">
           <TypeBadge type={event.type} />
           {event.isTour && <span className="badge tour">Koncertturné</span>}
+          {event.accommodation && <span className="badge">🛏️ Szállás kérhető</span>}
           <span className="badge">{choirNames(event.choirs)}</span>
         </div>
 
         {event.status === 'cancelled' && <div className="notice err"><b>Ez az esemény elmarad.</b></div>}
 
         <div className="card info">
-          <div className="row"><span className="ico">📅</span><div><div className="lbl">Időpont</div>{formatDate(event.date)}{timeRange(event) && <>, <b>{timeRange(event)}</b></>}</div></div>
+          <div className="row"><span className="ico">📅</span><div><div className="lbl">Időpont</div>{event.endDate
+            ? <>{formatDate(event.date)}{event.startTime && <>, <b>{event.startTime}</b></>} – {formatDate(event.endDate)}{event.endTime && <>, <b>{event.endTime}</b></>}</>
+            : <>{formatDate(event.date)}{timeRange(event) && <>, <b>{timeRange(event)}</b></>}</>}</div></div>
           <div className="row">
             <span className="ico">📍</span>
             <div style={{ flex: 1 }}>
@@ -80,6 +84,13 @@ export default function EventDetail({ id, onChange }) {
                 </button>
               ))}
             </div>
+            {event.accommodation && (event.myResponse === 'yes' || event.myResponse === 'maybe') && (
+              <label className="check room-check">
+                <input type="checkbox" checked={event.myAccommodation} disabled={busy || !event.isOpen} onChange={(e) => respond(event.myResponse, e.target.checked)} />
+                🛏️ Kérek szállást
+              </label>
+            )}
+            {event.accommodation && !event.myResponse && event.isOpen && <p className="hint" style={{ marginTop: 10 }}>🛏️ Erre az eseményre szállást is kérhetsz – jelölj „Részt veszek” vagy „Talán” választ, és megjelenik a lehetőség.</p>}
             {!event.isOpen && !event.myResponse && <p className="muted small" style={{ marginTop: 12 }}>Erre az eseményre nem jeleztél vissza.</p>}
           </div>
         )}

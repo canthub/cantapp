@@ -154,6 +154,10 @@ const MIGRATIONS = [
   // Személyes naptár-feliratkozás titkos kulcsa (a link: /api/calendar/<kulcs>.ics).
   `ALTER TABLE members ADD COLUMN calendar_token TEXT;
   CREATE UNIQUE INDEX members_calendar_token ON members(calendar_token);`,
+  // Több napos események (utolsó nap) és szálláskérés: az eseménynél engedélyezhető, a tag a válaszában kérheti.
+  `ALTER TABLE events ADD COLUMN end_date TEXT NOT NULL DEFAULT '';
+  ALTER TABLE events ADD COLUMN accommodation INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE responses ADD COLUMN accommodation INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export function openDb(file) {

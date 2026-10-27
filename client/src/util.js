@@ -28,6 +28,16 @@ export function dateParts(date) {
   };
 }
 
+// Több napos eseménynél: „nov. 12–14.” vagy „nov. 30. – dec. 2.”
+export function dayRange(ev) {
+  if (!ev.endDate) return '';
+  const f = (d, opts) => new Intl.DateTimeFormat('hu-HU', { timeZone: 'UTC', ...opts }).format(new Date(`${d}T12:00:00Z`));
+  const sameMonth = ev.date.slice(0, 7) === ev.endDate.slice(0, 7);
+  return sameMonth
+    ? `${f(ev.date, { month: 'short', day: 'numeric' }).replace(/\.$/, '')}–${f(ev.endDate, { day: 'numeric' })}`
+    : `${f(ev.date, { month: 'short', day: 'numeric' })} – ${f(ev.endDate, { month: 'short', day: 'numeric' })}`;
+}
+
 export function timeRange(ev) {
   if (!ev.startTime) return '';
   return ev.endTime ? `${ev.startTime}–${ev.endTime}` : ev.startTime;

@@ -3,7 +3,7 @@ import { api, toast } from '../../api.js';
 import { navigate } from '../../router.js';
 import { CHOIRS } from '../../../../shared/constants.js';
 import { TopBar, Spinner, Empty, TypeBadge, DateBox, ProgressBar, useLoad } from '../../components/ui.jsx';
-import { timeRange, todayIso, choirNames, formatShortIso } from '../../util.js';
+import { timeRange, dayRange, todayIso, choirNames, formatShortIso } from '../../util.js';
 
 const FILTERS = {
   open: { label: 'Folyamatban', test: (e) => e.status === 'published' && e.isOpen },
@@ -72,7 +72,7 @@ export default function AdminEvents() {
             <span className="badge">{choirNames(ev.choirs)}</span>
             <StatusBadge ev={ev} />
           </div>
-          <div className="meta">{[timeRange(ev), ev.city].filter(Boolean).join(' · ')} · határidő: {formatShortIso(ev.deadlineAt)}</div>
+          <div className="meta">{[dayRange(ev), ev.endDate ? ev.startTime : timeRange(ev), ev.city].filter(Boolean).join(' · ')} · határidő: {formatShortIso(ev.deadlineAt)}</div>
           {ev.status !== 'draft' && <ProgressBar stats={ev.stats} />}
           {ev.status === 'draft' && <div className="meta small">{ev.stats.total} érintett tag</div>}
         </div>

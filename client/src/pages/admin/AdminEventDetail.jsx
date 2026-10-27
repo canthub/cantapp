@@ -113,9 +113,12 @@ export default function AdminEventDetail({ id }) {
         </div>
 
         <div className="card info">
-          <div className="row"><span className="ico">📅</span><div>{formatDate(ev.date)}{timeRange(ev) && <>, <b>{timeRange(ev)}</b></>}</div></div>
+          <div className="row"><span className="ico">📅</span><div>{ev.endDate
+            ? <>{formatDate(ev.date)}{ev.startTime && <>, <b>{ev.startTime}</b></>} – {formatDate(ev.endDate)}{ev.endTime && <>, <b>{ev.endTime}</b></>}</>
+            : <>{formatDate(ev.date)}{timeRange(ev) && <>, <b>{timeRange(ev)}</b></>}</>}</div></div>
           <div className="row"><span className="ico">📍</span><div>{placeText(ev) || '–'}{ev.mapsUrl && <> · <a href={ev.mapsUrl} target="_blank" rel="noreferrer">Térkép</a></>}</div></div>
           <div className="row"><span className="ico">⏰</span><div>Határidő: <Deadline ev={ev} /></div></div>
+          {ev.accommodation && <div className="row"><span className="ico">🛏️</span><div>Szálláskérés engedélyezve – <b>{summary.accommodation} tag kér szállást</b></div></div>}
           <div className="row"><span className="ico">👥</span><div>Meghívottak: {ev.inviteMode === 'selected' ? <b>csak kijelölt tagok ({summary.total} fő)</b> : 'a kórus(ok) minden tagja'}</div></div>
           {ev.dressRehearsalId && <div className="row"><span className="ico">🎼</span><div>Kapcsolódó főpróba: <a href={`#/admin/esemeny/${ev.dressRehearsalId}`}>megnyitás</a></div></div>}
           {concerts.length > 0 && <div className="row"><span className="ico">🎤</span><div>Ehhez a főpróbához tartozó koncert: {concerts.map((c) => <a key={c.id} href={`#/admin/esemeny/${c.id}`} style={{ marginRight: 8 }}>{c.name}</a>)}</div></div>}
@@ -161,7 +164,7 @@ export default function AdminEventDetail({ id }) {
         <div className="card">
           <div className="table-wrap">
             <table className="list">
-              <thead><tr><th>Név</th><th>Szólam</th><th>Visszajelzés</th><th>Mikor</th><th>Emlékeztető</th></tr></thead>
+              <thead><tr><th>Név</th><th>Szólam</th><th>Visszajelzés</th>{ev.accommodation && <th>Szállás</th>}<th>Mikor</th><th>Emlékeztető</th></tr></thead>
               <tbody>
                 {visibleRows.map((r) => (
                   <tr key={r.memberId}>
@@ -174,11 +177,12 @@ export default function AdminEventDetail({ id }) {
                       </select>
                       {r.setByAdmin && <div className="small muted">admin rögzítette</div>}
                     </td>
+                    {ev.accommodation && <td>{r.accommodation ? '🛏️ kér' : ''}</td>}
                     <td className="small">{r.respondedAt ? formatShortIso(r.respondedAt) : ''}</td>
                     <td className="small">{r.reminders ? `${r.reminders.count}× · ${formatShortIso(r.reminders.last)}` : '–'}</td>
                   </tr>
                 ))}
-                {visibleRows.length === 0 && <tr><td colSpan={5} className="muted">Nincs ilyen tag.</td></tr>}
+                {visibleRows.length === 0 && <tr><td colSpan={ev.accommodation ? 6 : 5} className="muted">Nincs ilyen tag.</td></tr>}
               </tbody>
             </table>
           </div>

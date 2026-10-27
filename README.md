@@ -14,6 +14,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 - **Koncertre csak az jelölhet részvételt, aki a hozzá tartozó főpróbára is jelölt.** Ha valaki később a főpróbát „nem”-re állítja, a koncertre adott „igen”/„talán” válasza törlődik, és erről üzenetet kap.
 - Visszajelzéskor üzenet: *„Köszönjük, hogy visszajeleztél nekünk! 🙂”*.
 - A határidő után az esemény lezárul: látható marad, de már nem jelölhető.
+- **Szálláskérés:** a Nyíregyházán kívüli, több napos eseményeknél (amelyeknél ki van töltve az *Utolsó nap*) az admin engedélyezheti, hogy a tagok szállást kérjenek. Ilyenkor ez alapból be is van kapcsolva. A tag a „Részt veszek” vagy a „Talán” válasz mellé bepipálhatja a **„Kérek szállást”** lehetőséget. Az admin követő nézetében, a riportban és az exportban látszik, ki kér szállást, és hányan.
 - **Saját naptár-feliratkozás** (*Profil → Események a saját naptáradban*): személyes, titkos naptárlink iPhone/Mac, Google és Outlook naptárhoz. Minden esemény megjelenik benne, amelyre a tag meg van hívva, a válasz jelével a címben: ✅ részt veszek, ❓ talán, ❌ nem, ⏳ még nem jelzett vissza. A módosítások és a lemondások is frissülnek, a naptár saját frissítési ütemében (óránként–naponta). A link a Profil oldalon újragenerálható, ekkor a régi megszűnik.
 
 **Meghívottak eseményenként**
@@ -48,7 +49,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 
 A `templates/` mappában (és az admin felületen letölthetően):
 - `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Irányítószám, Lakóhely (település), Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Admin (igen/nem).
-- `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Kezdés, Befejezés, Típus, Énekkar, Turné, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
+- `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Utolsó nap, Kezdés, Befejezés, Típus, Énekkar, Turné, Szálláskérés, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
 
 Az Excel-sablonok második munkalapján kitöltési útmutató található.
 

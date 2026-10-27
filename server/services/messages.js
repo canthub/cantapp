@@ -7,6 +7,7 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 export const eventUrl = (ev) => `/#/esemeny/${ev.id}`;
 
 function when(ev) {
+  if (ev.endDate) return `${formatDateHu(ev.date, ev.startTime)} – ${formatDateHu(ev.endDate, ev.endTime)}`;
   const time = ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : '';
   return formatDateHu(ev.date, time);
 }
@@ -18,7 +19,7 @@ function place(ev) {
 function details(ev) {
   const rows = [
     ['Esemény', ev.name],
-    ['Típus', ev.typeLabel + (ev.isTour ? ' (koncertturné)' : '')],
+    ['Típus', ev.typeLabel + (ev.isTour ? ' (koncertturné)' : '') + (ev.accommodation ? ' – szállás kérhető' : '')],
     ['Énekkar', ev.choirs.map((c) => CHOIRS[c]).join(', ')],
     ['Időpont', when(ev)],
     ['Helyszín', place(ev) || '–'],

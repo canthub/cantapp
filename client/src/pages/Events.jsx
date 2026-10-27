@@ -3,7 +3,7 @@ import { api } from '../api.js';
 import { navigate } from '../router.js';
 import { CHOIRS } from '../../../shared/constants.js';
 import { TopBar, Spinner, Empty, TypeBadge, DateBox, ResponsePill, useLoad } from '../components/ui.jsx';
-import { timeRange, todayIso, choirNames } from '../util.js';
+import { timeRange, dayRange, todayIso, choirNames } from '../util.js';
 
 export function EventCard({ ev, showChoirs }) {
   const place = [ev.venue, ev.city].filter(Boolean).join(', ');
@@ -17,7 +17,7 @@ export function EventCard({ ev, showChoirs }) {
           {ev.isTour && <span className="badge tour">Turné</span>}
           {showChoirs && <span className="badge">{choirNames(ev.choirs)}</span>}
         </div>
-        <div className="meta">{[timeRange(ev), place].filter(Boolean).join(' · ')}</div>
+        <div className="meta">{[dayRange(ev), ev.endDate ? ev.startTime : timeRange(ev), place].filter(Boolean).join(' · ')}</div>
         <ResponsePill ev={ev} />
       </div>
     </div>

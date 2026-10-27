@@ -77,14 +77,18 @@ const VTIMEZONE = [
 function eventLines(ev, response, now) {
   const status = response?.status || 'none';
   const lines = ['BEGIN:VEVENT', `UID:event-${ev.id}@cantapp`, `DTSTAMP:${utcStamp(now.toISOString())}`];
+  const lastDay = ev.endDate || ev.date;
   if (ev.startTime) {
     const start = DateTime.fromISO(`${ev.date}T${ev.startTime}`, { zone: TZ });
-    let end = ev.endTime ? DateTime.fromISO(`${ev.date}T${ev.endTime}`, { zone: TZ }) : start.plus({ hours: DEFAULT_DURATION_HOURS });
+    let end = ev.endTime
+      ? DateTime.fromISO(`${lastDay}T${ev.endTime}`, { zone: TZ })
+      : DateTime.fromISO(`${lastDay}T${ev.startTime}`, { zone: TZ }).plus({ hours: DEFAULT_DURATION_HOURS });
     if (end <= start) end = end.plus({ days: 1 }); // éjfélen átnyúló esemény
     lines.push(`DTSTART;TZID=${TZ}:${localStamp(start)}`, `DTEND;TZID=${TZ}:${localStamp(end)}`);
   } else {
     const day = DateTime.fromISO(ev.date, { zone: TZ });
-    lines.push(`DTSTART;VALUE=DATE:${day.toFormat('yyyyLLdd')}`, `DTEND;VALUE=DATE:${day.plus({ days: 1 }).toFormat('yyyyLLdd')}`);
+    const after = DateTime.fromISO(lastDay, { zone: TZ }).plus({ days: 1 });
+    lines.push(`DTSTART;VALUE=DATE:${day.toFormat('yyyyLLdd')}`, `DTEND;VALUE=DATE:${after.toFormat('yyyyLLdd')}`);
   }
   const cancelled = ev.status === 'cancelled';
   lines.push(`SUMMARY:${escapeText(`${cancelled ? '🚫 ELMARAD: ' : `${PREFIX[status]} `}${ev.name}`)}`);
@@ -93,7 +97,7 @@ function eventLines(ev, response, now) {
   const link = `${config.appUrl}/#/esemeny/${ev.id}`;
   const description = [
     `${ev.typeLabel}${ev.isTour ? ' (koncertturné)' : ''} – ${ev.choirs.map((c) => CHOIRS[c]).join(', ')}`,
-    `Visszajelzésed: ${status === 'none' ? 'még nincs' : RESPONSES[status]}`,
+    `Visszajelzésed: ${status === 'none' ? 'még nincs' : RESPONSES[status]}${ev.accommodation && response?.accommodation ? ' (szállást kértél)' : ''}`,
     ev.isOpen ? `Visszajelzési határidő: ${formatIsoHu(ev.deadlineAt)}` : null,
     ev.notes ? `\n${ev.notes}` : null,
     `\nVisszajelzés és részletek az appban: ${link}`,
