@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, toast } from '../../api.js';
 import { navigate } from '../../router.js';
-import { CHOIRS, EVENT_TYPES, UNINVITED_MESSAGE } from '../../../../shared/constants.js';
+import { CHOIRS, EVENT_TYPES, UNINVITED_MESSAGE, HOME_CITY, accommodationAllowed, isMultiDay } from '../../../../shared/constants.js';
 import { TopBar, Spinner } from '../../components/ui.jsx';
 import InvitePicker from '../../components/InvitePicker.jsx';
 import { formatDate } from '../../util.js';
@@ -9,6 +9,7 @@ import { formatDate } from '../../util.js';
 const EMPTY = {
   name: '', type: 'proba', date: '', startTime: '', endTime: '', country: 'Magyarország', city: '', address: '', venue: '',
   isTour: false, deadlineDate: '', deadlineTime: '23:59', dressRehearsalId: '', notes: '', choirs: [], inviteMode: 'all', invitees: [],
+  endDate: '', accommodation: false,
 };
 
 function minusDays(date, n) {
@@ -26,6 +27,7 @@ export default function AdminEventForm({ id }) {
   const [invitedBefore, setInvitedBefore] = useState([]);
   const [copyFrom, setCopyFrom] = useState('');
   const [geo, setGeo] = useState(null);
+  const [roomTouched, setRoomTouched] = useState(!isNew);
   const [notifyChange, setNotifyChange] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +44,7 @@ export default function AdminEventForm({ id }) {
           address: e.address, venue: e.venue, isTour: e.isTour, deadlineDate: e.deadlineDate, deadlineTime: e.deadlineTime,
           dressRehearsalId: e.dressRehearsalId || '', notes: e.notes, choirs: e.choirs,
           inviteMode: e.inviteMode, invitees: e.invitees || [],
+          endDate: e.endDate || '', accommodation: e.accommodation,
         };
         setInvitedBefore(rows.map((r) => r.memberId));
         setForm(f);
@@ -65,6 +68,14 @@ export default function AdminEventForm({ id }) {
     }, 700);
     return () => clearTimeout(t);
   }, [form?.inviteMode, form?.address, form?.city, form?.country]);
+
+  // Szálláskérés: ha az esemény Nyíregyházán kívüli és több napos, új eseménynél alapból engedélyezett.
+  const roomAllowed = form ? accommodationAllowed(form) : false;
+  useEffect(() => {
+    if (!form) return;
+    if (!roomAllowed && form.accommodation) setForm((f) => ({ ...f, accommodation: false }));
+    else if (roomAllowed && !roomTouched && !form.accommodation) setForm((f) => ({ ...f, accommodation: true }));
+  }, [roomAllowed, roomTouched]);
 
   // Koncertnél a legközelebbi főpróba ajánlása.
   useEffect(() => {
@@ -142,9 +153,10 @@ export default function AdminEventForm({ id }) {
             </label>
             <label className="field"><span>Dátum *</span><input type="date" required value={form.date} onChange={set('date')} /></label>
           </div>
+          <label className="field"><span>Utolsó nap (csak több napos eseménynél)</span><input type="date" min={form.date || undefined} value={form.endDate} onChange={set('endDate')} /></label>
           <div className="grid2">
-            <label className="field"><span>Kezdés</span><input type="time" value={form.startTime} onChange={set('startTime')} /></label>
-            <label className="field"><span>Befejezés</span><input type="time" value={form.endTime} onChange={set('endTime')} /></label>
+            <label className="field"><span>{isMultiDay(form) ? 'Kezdés (első nap)' : 'Kezdés'}</span><input type="time" value={form.startTime} onChange={set('startTime')} /></label>
+            <label className="field"><span>{isMultiDay(form) ? 'Befejezés (utolsó nap)' : 'Befejezés'}</span><input type="time" value={form.endTime} onChange={set('endTime')} /></label>
           </div>
 
           <div className="field">
@@ -188,6 +200,14 @@ export default function AdminEventForm({ id }) {
             <label className="field"><span>Város</span><input type="text" value={form.city} onChange={set('city')} /></label>
             <label className="field"><span>Ország</span><input type="text" value={form.country} onChange={set('country')} /></label>
           </div>
+          {roomAllowed ? (
+            <label className="check">
+              <input type="checkbox" checked={form.accommodation} onChange={(e) => { setRoomTouched(true); set('accommodation')(e); }} />
+              🛏️ A tagok kérhetnek szállást („Kérek szállást” pipa a visszajelzésnél)
+            </label>
+          ) : (
+            isMultiDay(form) && <p className="hint">Szálláskérés csak {HOME_CITY}n kívüli helyszínnél lehetséges – add meg a várost.</p>
+          )}
 
           <h3 style={{ marginTop: 8 }}>Visszajelzés</h3>
           <div className="grid2">

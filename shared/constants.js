@@ -65,6 +65,19 @@ export function missedMessage(eventName) {
   return `Sajnáljuk, hogy nem tudsz részt venni ${article(eventName)} ${eventName} eseményen, reméljük a következőn találkozunk! 🙂 Ne felejts el visszajelezni a határidőig!`;
 }
 
+// Szálláskérés csak a Nyíregyházán kívüli, több napos eseményeknél lehetséges.
+export const HOME_CITY = 'Nyíregyháza';
+const plainCity = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+
+export function isMultiDay(ev) {
+  return Boolean(ev.endDate) && ev.endDate > ev.date;
+}
+
+export function accommodationAllowed(ev) {
+  const city = plainCity(ev.city);
+  return isMultiDay(ev) && Boolean(city) && city !== plainCity(HOME_CITY);
+}
+
 export function mapsUrl(ev) {
   // Csak országgal nincs értelme térképet nyitni.
   if (!ev.venue && !ev.address && !ev.city) return null;

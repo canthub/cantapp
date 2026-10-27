@@ -1,5 +1,5 @@
 import { getDb, tx, nowIso } from './db.js';
-import { CHOIRS, EVENT_TYPES, mapsUrl } from '../shared/constants.js';
+import { CHOIRS, EVENT_TYPES, mapsUrl, accommodationAllowed } from '../shared/constants.js';
 import {
   isDate, isTime, localToUtcIso, deadlineToUtcIso, localDateOf, localTimeOf, defaultDeadlineDate,
 } from './services/time.js';
@@ -149,6 +149,7 @@ export function serializeEvent(row, now = new Date()) {
     date: row.date,
     startTime: row.start_time,
     endTime: row.end_time,
+    endDate: row.end_date,
     startsAt: row.starts_at,
     country: row.country,
     city: row.city,
@@ -167,6 +168,7 @@ export function serializeEvent(row, now = new Date()) {
     source: row.source,
     choirs: choirsOfEvent(row.id),
     inviteMode: row.invite_mode,
+    accommodation: Boolean(row.accommodation),
     isOpen: isEventOpen(row, now),
   };
   ev.mapsUrl = mapsUrl(ev);
@@ -197,6 +199,7 @@ export function normalizeEventInput(input) {
     date: str(input.date),
     startTime: str(input.startTime),
     endTime: str(input.endTime),
+    endDate: str(input.endDate),
     country: str(input.country),
     city: str(input.city),
     address: str(input.address),
@@ -210,12 +213,18 @@ export function normalizeEventInput(input) {
     inviteMode: input.inviteMode === 'selected' ? 'selected' : 'all',
     // null = a meglévő meghívotti lista változatlan marad (pl. naptárszinkronnál)
     invitees: Array.isArray(input.invitees) ? [...new Set(input.invitees.map(Number).filter(Number.isInteger))] : null,
+    accommodation: Boolean(input.accommodation),
   };
   if (!e.name) throw new ValidationError('Az esemény nevének megadása kötelező.');
   if (!(e.type in EVENT_TYPES)) throw new ValidationError('Érvénytelen eseménytípus.');
   if (!isDate(e.date)) throw new ValidationError(`Érvénytelen dátum: „${e.date}” (formátum: ÉÉÉÉ-HH-NN).`);
   if (e.startTime && !isTime(e.startTime)) throw new ValidationError(`Érvénytelen kezdési időpont: „${e.startTime}” (formátum: ÓÓ:PP).`);
   if (e.endTime && !isTime(e.endTime)) throw new ValidationError(`Érvénytelen befejezési időpont: „${e.endTime}”.`);
+  if (e.endDate && !isDate(e.endDate)) throw new ValidationError(`Érvénytelen utolsó nap: „${e.endDate}” (formátum: ÉÉÉÉ-HH-NN).`);
+  if (e.endDate && e.endDate < e.date) throw new ValidationError('Az utolsó nap nem lehet korábbi, mint az esemény kezdőnapja.');
+  if (e.endDate === e.date) e.endDate = '';
+  // Szálláskérés csak Nyíregyházán kívüli, több napos eseménynél – egyébként automatikusan kikapcsol.
+  if (!accommodationAllowed(e)) e.accommodation = false;
   if (e.choirs.length === 0) throw new ValidationError('Legalább egy énekkart ki kell választani.');
   if (!e.deadlineDate) e.deadlineDate = defaultDeadlineDate(e.date, config.defaultDeadlineDays);
   if (!isDate(e.deadlineDate)) throw new ValidationError(`Érvénytelen visszajelzési határidő: „${e.deadlineDate}”.`);
@@ -245,6 +254,8 @@ function eventColumns(e) {
     date: e.date,
     start_time: e.startTime,
     end_time: e.endTime,
+    end_date: e.endDate,
+    accommodation: e.accommodation ? 1 : 0,
     starts_at: localToUtcIso(e.date, e.startTime || '00:00'),
     country: e.country,
     city: e.city,
@@ -326,7 +337,7 @@ export function updateEvent(id, input, now = new Date()) {
       db.prepare('UPDATE events SET closed_at = NULL, report_sent_at = NULL WHERE id = ?').run(id);
     }
   });
-  const keyFields = ['date', 'start_time', 'end_time', 'country', 'city', 'address', 'venue'];
+  const keyFields = ['date', 'end_date', 'start_time', 'end_time', 'country', 'city', 'address', 'venue'];
   const invitedAfter = new Set(eligibleMembers(id).map((m) => m.id));
   return {
     importantChange: keyFields.some((k) => before[k] !== cols[k]),

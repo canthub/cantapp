@@ -129,7 +129,7 @@ test('teljes folyamat: közzététel, visszajelzés, főpróba-szabály, emléke
 
   // Riport tartalom és exportok.
   const report = buildReport(concertId, at('2026-11-20'));
-  assert.deepEqual(report.summary, { total: 2, yes: 1, maybe: 0, no: 0, none: 1 });
+  assert.deepEqual(report.summary, { total: 2, yes: 1, maybe: 0, no: 0, none: 1, accommodation: 0 });
   assert.match(reportCsv(report), /Kovács Anna;Szoprán 1;Cantemus Vegyeskar;anna@example.com;;Részt vesz/);
   assert.ok((await reportXlsx(report)).length > 1000);
 });
