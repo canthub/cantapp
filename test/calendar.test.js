@@ -5,7 +5,7 @@ import { openDb } from '../server/db.js';
 import { config } from '../server/config.js';
 import { saveMember, createEvent, setEventStatus, updateEvent, getEvent, setMemberActive } from '../server/models.js';
 import { setResponse } from '../server/services/rsvp.js';
-import { getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar, foldLine } from '../server/services/calendarFeed.js';
+import { getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar, foldLine, calendarStatus } from '../server/services/calendarFeed.js';
 
 const now = new Date('2026-11-01T10:00:00Z');
 let anna;
@@ -109,4 +109,12 @@ test('HTTP: a feed bejelentkezés nélkül, a titkos linkkel tölthető le', asy
   } finally {
     server.close();
   }
+});
+
+test('állapot a Profil oldalnak: hány esemény kerül a naptárba, és van-e kórus', () => {
+  const st = calendarStatus(anna, now);
+  assert.equal(st.hasChoir, true);
+  assert.equal(st.eventCount, 5, 'próba, koncert, utazás, nyári tábor, lemondott próba');
+  const admin = saveMember({ lastName: 'Admin', firstName: 'Kórus nélkül', email: 'admin-nochoir@x.hu', isAdmin: true, choirs: [] }).id;
+  assert.deepEqual(calendarStatus(admin, now), { eventCount: 0, hasChoir: false });
 });
