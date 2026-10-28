@@ -49,7 +49,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 
 A `templates/` mappában (és az admin felületen letölthetően):
 - `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Irányítószám, Lakóhely (település), Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Admin (igen/nem).
-- `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Utolsó nap, Kezdés, Befejezés, Típus, Énekkar, Turné, Szálláskérés, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
+- `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Utolsó nap, Kezdés, Befejezés, Típus, Van főpróbája, Énekkar, Turné, Szálláskérés, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
 
 Az Excel-sablonok második munkalapján kitöltési útmutató található.
 

@@ -154,13 +154,43 @@ test('tagok importja a sablonból', async () => {
 test('események importja a sablonból (piszkozatként, koncert a főpróbához kötve)', async () => {
   const result = await importEventsTable(fs.readFileSync('templates/esemenyek_import_sablon.xlsx'), 'esemenyek.xlsx');
   assert.deepEqual(result.errors, []);
-  assert.equal(result.created, 4);
+  assert.equal(result.created, 6, '5 sor + az „igen” jelölésű koncert főpróbája');
   const rows = result.ids.map(getEventRow);
   assert.ok(rows.every((r) => r.status === 'draft'));
-  const concert = rows.find((r) => r.type === 'koncert');
-  const dr = rows.find((r) => r.type === 'foproba');
-  assert.equal(concert.dress_rehearsal_id, dr.id);
+  const byName = (n) => rows.find((r) => r.name === n);
+  assert.equal(byName('Adventi koncert').dress_rehearsal_id, byName('Adventi koncert – főpróba').id);
   assert.equal(rows.find((r) => r.type === 'utazas').is_tour, 1);
+
+  // „Van főpróbája: igen” – a főpróba a koncert előtti napon, ugyanabban az időben, 2 órás, ugyanott.
+  const dr = byName('Főpróba – Újévi koncert');
+  assert.equal(byName('Újévi koncert').dress_rehearsal_id, dr.id);
+  assert.deepEqual([dr.type, dr.date, dr.start_time, dr.end_time, dr.city, dr.venue, dr.status], ['foproba', '2027-01-08', '18:00', '20:00', 'Nyíregyháza', 'Példa hangversenyterem', 'draft']);
+  assert.equal(dr.deadline_at, byName('Újévi koncert').deadline_at, 'a főpróbára és a koncertre ugyanaddig lehet visszajelezni');
+});
+
+test('„Van főpróbája” oszlop: „nem” esetén nincs automatikus kapcsolás, utólag pótolható a főpróba', async () => {
+  const head = 'Esemény neve;Dátum;Kezdés;Típus;Van főpróbája;Énekkar;Visszajelzési határidő\n';
+  const csv = `${head}Tavaszi koncert;2027-04-10;19:00;koncert;igen;mindkettő;2027-04-20\nMúzeumi koncert;2027-04-14;11:00;koncert;nem;Pro Musica;\n`;
+  const r = await importEventsTable(Buffer.from(csv), 'f.csv');
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.created, 3);
+  const rows = r.ids.map(getEventRow);
+  const dr = rows.find((x) => x.type === 'foproba');
+  assert.equal(dr.date, '2027-04-09');
+  assert.equal(dr.end_time, '21:00');
+  assert.ok(dr.deadline_at < localToUtcIso('2027-04-09', '00:00'), 'a koncert határideje a főpróba utánra esne, ezért a főpróbáé az alapértelmezés');
+  assert.equal(rows.find((x) => x.name === 'Tavaszi koncert').dress_rehearsal_id, dr.id);
+  assert.equal(rows.find((x) => x.name === 'Múzeumi koncert').dress_rehearsal_id, null, 'a 5 nappal korábbi főpróbához sem kapcsolódik');
+
+  // Korábban főpróba nélkül beimportált piszkozat koncert: újraimportáláskor „igen”-nel megkapja a főpróbáját.
+  const later = `${head}Múzeumi koncert;2027-04-14;11:00;koncert;igen;Pro Musica;\n`;
+  const again = await importEventsTable(Buffer.from(later), 'f.csv');
+  assert.equal(again.created, 1);
+  assert.match(again.skippedItems[0], /kihagyva, de a főpróbáját hozzáadtuk/);
+  const museum = rows.find((x) => x.name === 'Múzeumi koncert').id;
+  assert.equal(getEventRow(museum).dress_rehearsal_id, again.ids[0]);
+  const third = await importEventsTable(Buffer.from(later), 'f.csv');
+  assert.equal(third.created, 0, 'harmadszorra már nincs mit létrehozni');
 });
 
 test('Google Naptár (.ics) import ismétlődő próbával', async () => {
@@ -194,7 +224,7 @@ test('duplikáció-védelem: ugyanaz az eseménytáblázat kétszer', async () =
   const file = fs.readFileSync('templates/esemenyek_import_sablon.csv');
   const again = await importEventsTable(file, 'esemenyek.csv');
   assert.equal(again.created, 0);
-  assert.equal(again.skipped, 4);
+  assert.equal(again.skipped, 5);
   assert.match(again.skippedItems[0], /már létezik az appban – kihagyva/);
 
   // Fájlon belüli ismétlődés (más kis-/nagybetűvel, szóközökkel) – csak az első sor jön létre.

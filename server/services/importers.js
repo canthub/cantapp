@@ -176,6 +176,41 @@ const sameEvent = (a, b) => a.date === b.date && a.startTime === b.startTime
   && a.name.toLowerCase().replace(/\s+/g, ' ') === b.name.toLowerCase().replace(/\s+/g, ' ')
   && a.choirs.some((c) => b.choirs.includes(c));
 
+// „Van főpróbája: igen” esetén a főpróba alapból a koncert előtti napon, a koncert kezdési idejében, 2 órás.
+// Helyszíne és kórusa a koncerté; határideje a koncerté (ha az nem a főpróba utánra esik).
+export function rehearsalFor(concert, deadlineDaysBefore = config.defaultDeadlineDays) {
+  const date = DateTime.fromISO(concert.date, { zone: TZ }).minus({ days: 1 }).toISODate();
+  const endTime = concert.startTime
+    ? DateTime.fromISO(`${date}T${concert.startTime}`, { zone: TZ }).plus({ hours: 2 }).toFormat('HH:mm')
+    : '';
+  return {
+    name: `Főpróba – ${concert.name}`,
+    type: 'foproba',
+    date,
+    startTime: concert.startTime,
+    endTime,
+    country: concert.country,
+    city: concert.city,
+    address: concert.address,
+    venue: concert.venue,
+    isTour: concert.isTour,
+    deadlineDate: concert.deadlineDate <= date ? concert.deadlineDate : defaultDeadlineDate(date, deadlineDaysBefore),
+    deadlineTime: concert.deadlineTime,
+    choirs: concert.choirs,
+  };
+}
+
+// A koncert főpróbája: ha (például egy korábbi importból) már létezik, azt használjuk, különben létrehozzuk.
+function ensureRehearsal(concert, result, deadlineDaysBefore) {
+  const input = rehearsalFor(concert, deadlineDaysBefore);
+  const existing = findDuplicateEvent(input);
+  if (existing) return existing.id;
+  const id = createEvent(input, { source: 'import' });
+  result.created++;
+  result.ids.push(id);
+  return id;
+}
+
 export async function importEventsTable(buffer, filename, { defaultChoirs = [], deadlineDaysBefore = config.defaultDeadlineDays } = {}) {
   const rows = await readTable(buffer, filename);
   const result = { created: 0, skipped: 0, skippedItems: [], errors: [], ids: [] };
@@ -209,6 +244,8 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
           accommodation: pick(row, 'Szálláskérés', 'Szállás') ? parseBool(pick(row, 'Szálláskérés', 'Szállás')) : true,
         };
         const e = normalizeEventInput(input);
+        const rehearsalCell = type === 'koncert' ? pick(row, 'Van főpróbája', 'Főpróba', 'Főpróbája van') : '';
+        const wantsRehearsal = rehearsalCell ? parseBool(rehearsalCell) : null; // üres: a régi automatikus kapcsolás
         const label = `„${e.name}” (${e.date}${e.startTime ? ` ${e.startTime}` : ''})`;
         const twin = inFile.find((x) => sameEvent(x.e, e));
         if (twin) {
@@ -217,12 +254,22 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
           continue;
         }
         inFile.push({ e, line });
-        if (findDuplicateEvent(e)) {
+        const existing = findDuplicateEvent(e);
+        if (existing) {
           result.skipped++;
-          result.skippedItems.push(`${line}. sor: ${label} már létezik az appban – kihagyva.`);
+          // Ha egy korábban beimportált, még piszkozat koncertnek most lett főpróbája, azt pótoljuk.
+          if (wantsRehearsal && existing.status === 'draft' && !existing.dress_rehearsal_id) {
+            const drId = ensureRehearsal(e, result, deadlineDaysBefore);
+            getDb().prepare('UPDATE events SET dress_rehearsal_id = ?, updated_at = ? WHERE id = ?').run(drId, new Date().toISOString(), existing.id);
+            result.skippedItems.push(`${line}. sor: ${label} már létezik az appban – kihagyva, de a főpróbáját hozzáadtuk.`);
+          } else {
+            result.skippedItems.push(`${line}. sor: ${label} már létezik az appban – kihagyva.`);
+          }
           continue;
         }
-        const id = createEvent(input, { source: 'import' });
+        // „nem” esetén a koncert nem kapcsolódik automatikusan egy másik koncert főpróbájához sem.
+        if (wantsRehearsal) input.dressRehearsalId = ensureRehearsal(e, result, deadlineDaysBefore);
+        const id = createEvent(input, { source: 'import', autoLinkDressRehearsal: wantsRehearsal === null });
         result.created++;
         result.ids.push(id);
       } catch (err) {
