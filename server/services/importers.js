@@ -145,7 +145,10 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
           voicePart: String(pick(row, 'Szólam')),
           postalCode: String(pick(row, 'Irányítószám', 'Irsz')),
           homeCity: String(pick(row, 'Lakóhely (település)', 'Lakóhely', 'Település', 'Város')),
-          isAdmin: parseBool(pick(row, 'Admin', 'Adminisztrátor')),
+          // Üres Admin cella: a meglévő jogosultság marad; az ADMIN_EMAILS címek mindig adminok.
+          isAdmin: config.adminEmails.includes(email) || (pick(row, 'Admin', 'Adminisztrátor') === ''
+            ? Boolean(getDb().prepare('SELECT is_admin FROM members WHERE email = ?').get(email)?.is_admin)
+            : parseBool(pick(row, 'Admin', 'Adminisztrátor'))),
           choirs,
           active: true,
         });

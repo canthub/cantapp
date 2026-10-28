@@ -453,3 +453,18 @@ test('közel lakók: lakóhely koordinátája a háttérben, gyorsítótárral, 
     setGeocoder(null);
   }
 });
+
+test('tagimport: üres Admin oszlop nem veszi el a meglévő admin jogot', async () => {
+  saveMember({ lastName: 'Admin', firstName: 'Meglévő', email: 'meglevo-admin@x.hu', isAdmin: true, choirs: ['cantemus'] });
+  const csv = 'Vezetéknév;Keresztnév;E-mail;Cantemus Vegyeskar;Pro Musica;Admin\n'
+    + 'Admin;Meglévő;meglevo-admin@x.hu;igen;nem;\n'
+    + 'Sima;Tag;sima-tag@x.hu;igen;nem;\n';
+  const r = await importMembers(Buffer.from(csv), 'x.csv');
+  assert.deepEqual(r.errors, []);
+  const isAdmin = (e) => getDb().prepare('SELECT is_admin FROM members WHERE email = ?').get(e).is_admin;
+  assert.equal(isAdmin('meglevo-admin@x.hu'), 1);
+  assert.equal(isAdmin('sima-tag@x.hu'), 0);
+  // Kifejezett „nem” viszont elveszi.
+  await importMembers(Buffer.from('Vezetéknév;Keresztnév;E-mail;Cantemus Vegyeskar;Admin\nAdmin;Meglévő;meglevo-admin@x.hu;igen;nem\n'), 'y.csv');
+  assert.equal(isAdmin('meglevo-admin@x.hu'), 0);
+});

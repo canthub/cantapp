@@ -112,11 +112,23 @@ function eventLines(ev, response, now) {
   return lines;
 }
 
-export function buildMemberCalendar(memberId, now = new Date()) {
+// A tag naptárába kerülő események: közzétett (vagy utólag lemondott), legfeljebb 60 napja volt, és meg van rá hívva.
+function memberCalendarRows(memberId, now) {
   const from = DateTime.fromJSDate(now).minus({ days: PAST_DAYS }).toISODate();
-  const rows = getDb()
+  return getDb()
     .prepare(`SELECT id, updated_at FROM events WHERE status IN ('published', 'cancelled') AND published_at IS NOT NULL AND date >= ? ORDER BY starts_at`)
-    .all(from);
+    .all(from)
+    .filter((r) => isEligible(r.id, memberId));
+}
+
+// A Profil oldalon megjelenő állapot: hány esemény kerül a naptárba, és ha egy sem, miért.
+export function calendarStatus(memberId, now = new Date()) {
+  const choirs = getDb().prepare('SELECT COUNT(*) AS n FROM member_choirs WHERE member_id = ?').get(memberId).n;
+  return { eventCount: memberCalendarRows(memberId, now).length, hasChoir: choirs > 0 };
+}
+
+export function buildMemberCalendar(memberId, now = new Date()) {
+  const rows = memberCalendarRows(memberId, now);
   const lines = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cantemus Korus//cantapp//HU', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     'X-WR-CALNAME:Cantemus Kórus', `X-WR-TIMEZONE:${TZ}`, 'X-WR-CALDESC:Próbák\\, főpróbák\\, koncertek és utazások',
@@ -125,7 +137,6 @@ export function buildMemberCalendar(memberId, now = new Date()) {
     ...VTIMEZONE,
   ];
   for (const { id, updated_at: updatedAt } of rows) {
-    if (!isEligible(id, memberId)) continue;
     const ev = { ...getEvent(id, now), updatedAt };
     lines.push(...eventLines(ev, getResponse(id, memberId), now));
   }

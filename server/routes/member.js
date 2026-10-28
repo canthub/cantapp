@@ -8,7 +8,7 @@ import { getMemberByEmail, getEventRow, getEvent, serializeEvent, isEligible, ge
 import { setResponse, concertRuleAllows, concertRuleMessage } from '../services/rsvp.js';
 import { saveSubscription, removeSubscription } from '../services/push.js';
 import { sendMail, emailLayout, esc } from '../services/mailer.js';
-import { getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar } from '../services/calendarFeed.js';
+import { getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar, calendarStatus } from '../services/calendarFeed.js';
 
 export const memberRouter = Router();
 
@@ -125,11 +125,11 @@ memberRouter.get('/calendar/:file', (req, res) => {
 });
 
 memberRouter.get('/calendar-link', requireMember, (req, res) => {
-  res.json(calendarUrls(getCalendarToken(req.member.id)));
+  res.json({ ...calendarUrls(getCalendarToken(req.member.id)), ...calendarStatus(req.member.id) });
 });
 
 memberRouter.post('/calendar-link/reset', requireMember, (req, res) => {
-  res.json(calendarUrls(getCalendarToken(req.member.id, { reset: true })));
+  res.json({ ...calendarUrls(getCalendarToken(req.member.id, { reset: true })), ...calendarStatus(req.member.id) });
 });
 
 // ---------------------------------------------------------------- Push

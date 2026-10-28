@@ -74,7 +74,7 @@ export default function Profile({ me }) {
           )}
         </div>
 
-        <CalendarCard />
+        <CalendarCard isAdmin={m.isAdmin} />
 
         {!isStandalone() && (
           <div className="card">
