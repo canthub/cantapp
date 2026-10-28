@@ -154,7 +154,7 @@ export default function AdminImport() {
 
         <div className="card">
           <h2>📊 Események importálása táblázatból</h2>
-          <p className="small">Töltsd le a sablont, töltsd ki (egy sor = egy esemény), majd töltsd fel. Az események <b>piszkozatként</b> jönnek létre, így közzététel előtt még ellenőrizheted őket. Ha egy esemény (ugyanaz a név, nap, kezdés és kórus) már létezik, a sor kimarad – így ugyanaz a táblázat kétszer feltöltve sem okoz duplikációt.</p>
+          <p className="small">Töltsd le a sablont, töltsd ki (egy sor = egy esemény), majd töltsd fel. Az események <b>piszkozatként</b> jönnek létre, így közzététel előtt még ellenőrizheted őket. Ha egy esemény (ugyanaz a név, nap, kezdés és kórus) már létezik, a sor kimarad – így ugyanaz a táblázat kétszer feltöltve sem okoz duplikációt. Ha egy koncertnél a <b>„Van főpróbája”</b> oszlopba „igen” kerül, a főpróbát is létrehozzuk (alapból a koncert előtti napon, ugyanabban az időpontban, 2 órásat), és a koncerthez kapcsoljuk.</p>
           <div className="btnrow">
             <a className="btn small" href="/api/admin/templates/esemenyek-xlsx">⬇️ Sablon (Excel)</a>
             <a className="btn small" href="/api/admin/templates/esemenyek-csv">⬇️ Sablon (CSV)</a>
