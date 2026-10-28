@@ -7,7 +7,7 @@ import {
   createEvent, updateEvent, getEvent, findDuplicateEvent, normalizeEventInput, eligibleMembers, eventStats, saveMember, setMemberActive, listMembers,
 } from '../models.js';
 import { getDb, tx } from '../db.js';
-import { TZ, defaultDeadlineDate } from './time.js';
+import { TZ, defaultDeadlineDate, formatIsoHu } from './time.js';
 import { config } from '../config.js';
 import { notifyMembers } from './notify.js';
 import { changeMessage } from './messages.js';
@@ -213,7 +213,7 @@ function ensureRehearsal(concert, result, deadlineDaysBefore) {
 
 export async function importEventsTable(buffer, filename, { defaultChoirs = [], deadlineDaysBefore = config.defaultDeadlineDays } = {}) {
   const rows = await readTable(buffer, filename);
-  const result = { created: 0, skipped: 0, skippedItems: [], errors: [], ids: [] };
+  const result = { created: 0, skipped: 0, skippedItems: [], errors: [], warnings: [], ids: [] };
   // A sorrend számít: a főpróbák előbb kerüljenek be, hogy a koncertek hozzájuk kapcsolódhassanak.
   const parsed = rows.map((row, i) => ({ row, line: i + 2, type: parseEventType(pick(row, 'Típus', 'Esemény típusa')) }));
   const inFile = []; // { e, line } – a fájlon belüli ismétlődések felismeréséhez
@@ -281,6 +281,13 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
   const byLine = (a, b) => parseInt(a, 10) - parseInt(b, 10);
   result.skippedItems.sort(byLine);
   result.errors.sort(byLine);
+  const now = new Date();
+  for (const id of result.ids) {
+    const ev = getEvent(id);
+    if (new Date(ev.deadlineAt) <= now) {
+      result.warnings.push(`„${ev.name}” (${ev.date}): a visszajelzési határidő (${formatIsoHu(ev.deadlineAt)}) már lejárt – közzététel előtt állíts be későbbit.`);
+    }
+  }
   return result;
 }
 

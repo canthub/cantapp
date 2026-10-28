@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { DEFAULT_DEADLINE_DAYS } from '../shared/constants.js';
 
 const list = (value, fallback = []) =>
   value ? value.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean) : fallback;
@@ -42,7 +43,7 @@ export const config = {
   // A határidő utáni napon ennyi órakor megy ki a riport.
   reportHour: Number(process.env.REPORT_HOUR || 8),
   // Ha egy eseménynél nincs megadva határidő, ennyi nappal az esemény előtt lesz.
-  defaultDeadlineDays: Number(process.env.DEFAULT_DEADLINE_DAYS || 7),
+  defaultDeadlineDays: Number(process.env.DEFAULT_DEADLINE_DAYS || DEFAULT_DEADLINE_DAYS),
   schedulerIntervalMs: Number(process.env.SCHEDULER_INTERVAL_MS || 5 * 60 * 1000),
   // Címből koordináta (OpenStreetMap Nominatim). GEOCODING=off kikapcsolja.
   geocoding: {

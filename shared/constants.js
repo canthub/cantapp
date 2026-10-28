@@ -31,6 +31,9 @@ export const EVENT_STATUSES = {
   cancelled: 'Elmarad',
 };
 
+// Ha egy eseménynél nincs megadva visszajelzési határidő, ennyi nappal az esemény előtt lesz.
+export const DEFAULT_DEADLINE_DAYS = 14;
+
 export const THANK_YOU_MESSAGE = 'Köszönjük, hogy visszajeleztél nekünk! 🙂';
 
 // Ezt kapja, akit közzététel után kivesznek az esemény meghívottjai közül.

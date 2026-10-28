@@ -350,6 +350,17 @@ export function deleteEvent(id) {
   getDb().prepare('DELETE FROM events WHERE id = ?').run(id);
 }
 
+// Lejárt határidejű eseményt nem teszünk közzé: az ütemező azonnal lezárná, a tagok a „Sajnáljuk…” üzenetet kapnák, és kimenne a riport.
+export function deadlinePassed(deadlineAt, now = new Date()) {
+  return new Date(deadlineAt) <= now;
+}
+
+export function assertPublishable(row, now = new Date()) {
+  if (deadlinePassed(row.deadline_at, now)) {
+    throw new ValidationError(`„${row.name}”: a visszajelzési határidő már lejárt – állíts be későbbi határidőt, és utána tedd közzé.`);
+  }
+}
+
 export function setEventStatus(id, status, now = new Date()) {
   const db = getDb();
   if (status === 'published') {

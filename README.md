@@ -11,6 +11,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 - Csak a saját énekkaruk eseményeit látják. Akik mindkét kórusnak tagjai, mindkettőét látják.
 - Esemény adatai: dátum, időpont, név, helyszín (ország, város, cím, épület), **„Megnyitás Google Térképen”** gomb, típus, énekkar, koncertturné jelölés.
 - Visszajelzés: *Részt veszek / Talán / Nem tudok részt venni*. A válasz a határidőig módosítható.
+- Visszajelzési határidő: ha nincs külön megadva, alapból **14 nappal** az esemény előtt (a `DEFAULT_DEADLINE_DAYS` környezeti változóval módosítható). Lejárt határidejű esemény nem tehető közzé – különben azonnal lezárulna.
 - **Koncertre csak az jelölhet részvételt, aki a hozzá tartozó főpróbára is jelölt.** Ha valaki később a főpróbát „nem”-re állítja, a koncertre adott „igen”/„talán” válasza törlődik, és erről üzenetet kap.
 - Visszajelzéskor üzenet: *„Köszönjük, hogy visszajeleztél nekünk! 🙂”*.
 - A határidő után az esemény lezárul: látható marad, de már nem jelölhető.
