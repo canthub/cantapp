@@ -47,7 +47,8 @@ export default function AdminEvents() {
     if (!confirm(`${selected.size} esemény közzététele? Az érintett tagok azonnal értesítést kapnak.`)) return;
     try {
       const res = await api('/admin/events/publish-bulk', { method: 'POST', body: { ids: [...selected] } });
-      toast(`${res.published} esemény közzétéve, ${res.announced} értesítés kiküldve.`);
+      toast(`${res.published} esemény közzétéve, ${res.announced} értesítés kiküldve.`
+        + (res.expired?.length ? ` Lejárt határidő miatt piszkozat maradt: ${res.expired.join(', ')}.` : ''), res.expired?.length ? 'err' : undefined);
       setSelected(new Set());
       reload();
     } catch (err) {

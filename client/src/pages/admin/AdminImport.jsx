@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, toast } from '../../api.js';
 import { navigate } from '../../router.js';
-import { CHOIRS, EVENT_TYPES } from '../../../../shared/constants.js';
+import { CHOIRS, EVENT_TYPES, DEFAULT_DEADLINE_DAYS } from '../../../../shared/constants.js';
 import { TopBar } from '../../components/ui.jsx';
 import { AdminNav } from './AdminEvents.jsx';
 import { todayIso } from '../../util.js';
@@ -16,7 +16,7 @@ function ChoirPicker({ value, onChange }) {
 function Result({ result }) {
   if (!result) return null;
   return (
-    <div className={`notice ${result.errors.length ? 'warn' : 'ok'}`}>
+    <div className={`notice ${result.errors.length || result.warnings?.length ? 'warn' : 'ok'}`}>
       ✔ Létrehozva: <b>{result.created}</b> esemény (piszkozatként)
       {result.updated ? <> · Frissítve: <b>{result.updated}</b></> : null}
       {result.skipped ? <> · Kihagyva, mert már létezik: <b>{result.skipped}</b></> : null}
@@ -28,6 +28,7 @@ function Result({ result }) {
           <ul className="result-list">{result.skippedItems.map((e) => <li key={e}>{e}</li>)}</ul>
         </details>
       )}
+      {result.warnings?.length > 0 && <><div style={{ marginTop: 6 }}>⚠️ Lejárt határidő – ezeket csak a határidő módosítása után lehet közzétenni:</div><ul className="result-list">{result.warnings.map((e) => <li key={e}>{e}</li>)}</ul></>}
       {result.errors.length > 0 && <><div style={{ marginTop: 6 }}>Hibás sorok (ezek kimaradtak):</div><ul className="result-list">{result.errors.map((e) => <li key={e}>{e}</li>)}</ul></>}
       {result.created > 0 && <div style={{ marginTop: 8 }}><button className="btn small" onClick={() => navigate('/admin')}>Piszkozatok ellenőrzése és közzététele →</button></div>}
     </div>
@@ -95,7 +96,7 @@ export default function AdminImport() {
   // Táblázat
   const [file, setFile] = useState(null);
   const [tableChoirs, setTableChoirs] = useState([]);
-  const [tableDays, setTableDays] = useState(7);
+  const [tableDays, setTableDays] = useState(DEFAULT_DEADLINE_DAYS);
   const [tableResult, setTableResult] = useState(null);
   // Naptár
   const [icsMode, setIcsMode] = useState('url');
@@ -104,7 +105,7 @@ export default function AdminImport() {
   const [icsChoirs, setIcsChoirs] = useState([]);
   const [from, setFrom] = useState(todayIso());
   const [to, setTo] = useState('');
-  const [icsDays, setIcsDays] = useState(7);
+  const [icsDays, setIcsDays] = useState(DEFAULT_DEADLINE_DAYS);
   const [defaultType, setDefaultType] = useState('proba');
   const [icsResult, setIcsResult] = useState(null);
   const [busy, setBusy] = useState(false);

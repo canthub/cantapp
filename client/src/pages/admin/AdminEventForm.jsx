@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, toast } from '../../api.js';
 import { navigate } from '../../router.js';
-import { CHOIRS, EVENT_TYPES, UNINVITED_MESSAGE, HOME_CITY, accommodationAllowed, isMultiDay } from '../../../../shared/constants.js';
+import { CHOIRS, EVENT_TYPES, UNINVITED_MESSAGE, HOME_CITY, DEFAULT_DEADLINE_DAYS, accommodationAllowed, isMultiDay } from '../../../../shared/constants.js';
 import { TopBar, Spinner } from '../../components/ui.jsx';
 import InvitePicker from '../../components/InvitePicker.jsx';
-import { formatDate } from '../../util.js';
+import { formatDate, todayIso } from '../../util.js';
 
 const EMPTY = {
   name: '', type: 'proba', date: '', startTime: '', endTime: '', country: 'Magyarország', city: '', address: '', venue: '',
@@ -53,9 +53,9 @@ export default function AdminEventForm({ id }) {
     }
   }, [id, isNew]);
 
-  // Új eseménynél a határidőt automatikusan 7 nappal az esemény elé állítjuk (amíg kézzel nem módosítják).
+  // Új eseménynél a határidőt automatikusan 14 nappal az esemény elé állítjuk (amíg kézzel nem módosítják).
   useEffect(() => {
-    if (form?.date && !deadlineTouched) setForm((f) => ({ ...f, deadlineDate: minusDays(f.date, 7) }));
+    if (form?.date && !deadlineTouched) setForm((f) => ({ ...f, deadlineDate: minusDays(f.date, DEFAULT_DEADLINE_DAYS) }));
   }, [form?.date, deadlineTouched]);
 
   // Meghívottak kijelölésekor a tagok távolsága a helyszíntől (a gépelés után kis késleltetéssel).
@@ -215,6 +215,7 @@ export default function AdminEventForm({ id }) {
             <label className="field"><span>Határidő (óra)</span><input type="time" value={form.deadlineTime} onChange={set('deadlineTime')} /></label>
           </div>
           {form.date && form.deadlineDate > form.date && <div className="notice warn">A határidő az esemény utánra esik – biztosan jó így?</div>}
+          {form.deadlineDate && form.deadlineDate < todayIso() && !isPublished && <div className="notice warn">A határidő már elmúlt – ilyen eseményt nem lehet közzétenni. Adj meg későbbi dátumot.</div>}
 
           {form.type === 'koncert' && (
             <label className="field"><span>Kapcsolódó főpróba</span>

@@ -47,7 +47,7 @@ const templates = {
       'Turné: „igen”, ha az esemény koncertturné része.',
       'Utolsó nap: csak több napos eseménynél kell kitölteni (ÉÉÉÉ-HH-NN).',
       'Szálláskérés: „igen” vagy „nem” – a tagok kérhetnek-e szállást. Csak Nyíregyházán kívüli, több napos eseménynél lehetséges; üresen hagyva ilyenkor automatikusan engedélyezett.',
-      'Visszajelzési határidő: ha üresen hagyod, az import ablakban megadott számú nappal az esemény előtt lesz.',
+      'Visszajelzési határidő: ha üresen hagyod, az import ablakban megadott számú nappal (alapból 14 nappal) az esemény előtt lesz.',
       'Van főpróbája (csak koncertnél): „igen” esetén az app létrehozza a főpróbát is – alapból a koncert előtti napon, a koncert kezdési idejében, 2 órásat, ugyanott és ugyanannak a kórusnak –, és hozzákapcsolja a koncerthez. „nem” esetén a koncertnek nincs főpróbája.',
       'Ha üresen hagyod, a koncert a legközelebbi (14 napon belüli) főpróbához kapcsolódik – így a főpróbát külön sorban is megadhatod. Az appban mindez módosítható.',
       'Az importált események piszkozatként jönnek létre: ellenőrzés után az appban kell közzétenni őket.',

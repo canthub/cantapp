@@ -8,8 +8,10 @@ import { getDb } from '../db.js';
 import {
   listEvents, getEvent, getEventRow, createEvent, updateEvent, deleteEvent, setEventStatus, eventStats,
   eligibleMembers, responsesByMember, listMembers, getMember, saveMember, setMemberActive,
-  reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput, getInvitees,
+  reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput, getInvitees, assertPublishable, deadlinePassed,
 } from '../models.js';
+import { config } from '../config.js';
+import { deadlineToUtcIso } from '../services/time.js';
 import { setResponse, withdrawInvitations } from '../services/rsvp.js';
 import { notifyMembers, logReminder } from '../services/notify.js';
 import { reminderMessage, generalReminderMessage, changeMessage, cancelMessage } from '../services/messages.js';
@@ -48,6 +50,10 @@ adminRouter.post('/events/suggest-dress-rehearsal', (req, res) => {
 });
 
 adminRouter.post('/events', async (req, res) => {
+  if (req.body.publish) {
+    const e = normalizeEventInput(req.body);
+    assertPublishable({ name: e.name, deadline_at: deadlineToUtcIso(e.deadlineDate, e.deadlineTime) });
+  }
   const id = createEvent(req.body);
   if (req.body.publish) {
     setEventStatus(id, 'published');
@@ -91,19 +97,23 @@ adminRouter.delete('/events/:id', (req, res) => {
 
 adminRouter.post('/events/:id/publish', async (req, res) => {
   const id = eventId(req);
+  assertPublishable(getEventRow(id));
   setEventStatus(id, 'published');
   const announced = await sendAnnouncements(id);
   res.json({ event: getEvent(id), announced });
 });
 
 adminRouter.post('/events/publish-bulk', async (req, res) => {
-  const ids = (req.body?.ids || []).map(Number).filter((id) => getEventRow(id)?.status === 'draft');
+  const drafts = (req.body?.ids || []).map(Number).map(getEventRow).filter((r) => r?.status === 'draft');
+  // A lejárt határidejűek piszkozatként maradnak – az admin előbb javítsa a határidőt.
+  const expired = drafts.filter((r) => deadlinePassed(r.deadline_at)).map((r) => r.name);
+  const ids = drafts.filter((r) => !deadlinePassed(r.deadline_at)).map((r) => r.id);
   let announced = 0;
   for (const id of ids) {
     setEventStatus(id, 'published');
     announced += await sendAnnouncements(id);
   }
-  res.json({ published: ids.length, announced });
+  res.json({ published: ids.length, announced, expired });
 });
 
 adminRouter.post('/events/:id/unpublish', (req, res) => {
@@ -233,7 +243,7 @@ adminRouter.post('/import/events', upload.single('file'), async (req, res) => {
   const defaultChoirs = String(req.body.choirs || '').split(',').filter(Boolean);
   res.json(await importEventsTable(file.buffer, file.originalname, {
     defaultChoirs,
-    deadlineDaysBefore: Number(req.body.deadlineDaysBefore || 7),
+    deadlineDaysBefore: Number(req.body.deadlineDaysBefore || config.defaultDeadlineDays),
   }));
 });
 
@@ -244,7 +254,7 @@ adminRouter.post('/import/ics', upload.single('file'), async (req, res) => {
     choirs: String(req.body.choirs || '').split(',').filter(Boolean),
     from: req.body.from || null,
     to: req.body.to || null,
-    deadlineDaysBefore: Number(req.body.deadlineDaysBefore || 7),
+    deadlineDaysBefore: Number(req.body.deadlineDaysBefore || config.defaultDeadlineDays),
     defaultType: req.body.defaultType || 'proba',
   }));
 });
