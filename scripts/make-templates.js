@@ -9,19 +9,21 @@ fs.mkdirSync(OUT, { recursive: true });
 const templates = {
   tagok_import_sablon: {
     sheet: 'Tagok',
-    headers: ['Vezetéknév', 'Keresztnév', 'E-mail', 'Telefon', 'Szólam', 'Irányítószám', 'Lakóhely (település)', 'Cantemus Vegyeskar', 'Pro Musica', 'Admin'],
-    widths: [18, 18, 32, 18, 14, 13, 22, 20, 14, 10],
+    headers: ['Vezetéknév', 'Keresztnév', 'E-mail', 'Telefon', 'Szólam', 'Irányítószám', 'Lakóhely (település)', 'Cantemus Vegyeskar', 'Pro Musica', 'Kisegítő művész', 'Admin'],
+    widths: [18, 18, 32, 18, 14, 13, 22, 20, 14, 17, 10],
     rows: [
-      ['Kovács', 'Anna', 'kovacs.anna@example.com', '+36 30 123 4567', 'Szoprán 1', '4400', 'Nyíregyháza', 'igen', 'nem', 'nem'],
-      ['Nagy', 'Péter', 'nagy.peter@example.com', '+36 20 765 4321', 'Basszus 2', '4300', 'Nyírbátor', 'igen', 'igen', 'nem'],
-      ['Szabó', 'Eszter', 'szabo.eszter@example.com', '', 'Alt 1', '', '', 'nem', 'igen', 'nem'],
+      ['Kovács', 'Anna', 'kovacs.anna@example.com', '+36 30 123 4567', 'Szoprán 1', '4400', 'Nyíregyháza', 'igen', 'nem', 'nem', 'nem'],
+      ['Nagy', 'Péter', 'nagy.peter@example.com', '+36 20 765 4321', 'Basszus 2', '4300', 'Nyírbátor', 'igen', 'igen', 'nem', 'nem'],
+      ['Szabó', 'Eszter', 'szabo.eszter@example.com', '', 'Alt 1', '', '', 'nem', 'igen', 'nem', 'nem'],
+      ['Tóth', 'Gábor', 'toth.gabor@example.com', '+36 70 111 2222', 'Tenor', '4025', 'Debrecen', 'nem', 'nem', 'igen', 'nem'],
     ],
     help: [
       'Kitöltési útmutató',
       'Egy sor = egy kórustag. A fejléc sort ne módosítsd!',
       'E-mail: kötelező, ez azonosítja a tagot (újraimportáláskor ez alapján frissül).',
       'Cantemus Vegyeskar / Pro Musica: „igen” vagy „nem”. Aki mindkettőnek tagja, mindkettőhöz „igen”-t írj.',
-      'Szólam: szabad szöveg, pl. Szoprán 1, Alt 2, Tenor 1, Basszus 2.',
+      'Kisegítő művész: „igen”, ha külsős (nem kórustag). Ő nem kap meghívást a kórus eseményeire, csak azokra, amelyekre az eseménynél egyenként kijelölöd; az eseményeket egyenként mentheti a naptárába. Kisegítő művésznél a kórusoszlopokat hagyd „nem”-en.',
+      'Szólam: szabad szöveg, pl. Szoprán 1, Alt 2, Tenor 1, Basszus 2 (kisegítőnél akár hangszer is).',
       'Irányítószám és Lakóhely (település): nem kötelező. Ebből számolja az app, ki lakik közel egy esemény helyszínéhez (pontos utcacímet nem kérünk).',
       'Admin: „igen”, ha a tag kezelheti az eseményeket és a tagokat.',
       'A példasorokat töröld ki importálás előtt!',

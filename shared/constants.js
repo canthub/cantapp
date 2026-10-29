@@ -31,6 +31,10 @@ export const EVENT_STATUSES = {
   cancelled: 'Elmarad',
 };
 
+// Harmadik tagi kategória: külsős kisegítő művészek – nem tartoznak kórushoz, eseményenként egyesével hívjuk meg őket.
+export const GUEST_LABEL = 'Kisegítő művész';
+export const GUESTS_LABEL = 'Kisegítő művészek';
+
 // Ha egy eseménynél nincs megadva visszajelzési határidő, ennyi nappal az esemény előtt lesz.
 export const DEFAULT_DEADLINE_DAYS = 14;
 

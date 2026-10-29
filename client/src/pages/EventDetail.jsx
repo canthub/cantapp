@@ -94,6 +94,18 @@ export default function EventDetail({ id, onChange }) {
             {!event.isOpen && !event.myResponse && <p className="muted small" style={{ marginTop: 12 }}>Erre az eseményre nem jeleztél vissza.</p>}
           </div>
         )}
+
+        {event.status !== 'cancelled' && event.calendar && (
+          <div className="card">
+            <h2>📅 Mentés a naptárba</h2>
+            <p className="small">Ezt az eseményt elmentheted a telefonod vagy a számítógéped naptárába.</p>
+            <div className="btnrow">
+              <a className="btn" href={event.calendar.icsUrl} target="_blank" rel="noreferrer">📱 iPhone / Outlook / egyéb naptár</a>
+              <a className="btn" href={event.calendar.googleUrl} target="_blank" rel="noreferrer">🗓️ Google Naptár</a>
+            </div>
+            <p className="hint" style={{ marginBottom: 0 }}>iPhone-on az első gomb után koppints a „Hozzáadás” lehetőségre. Androidon a Google Naptár gombot használd. Ha az esemény később módosul, értesítést kapsz – ilyenkor mentsd el újra (és szükség esetén töröld a régit).</p>
+          </div>
+        )}
       </div>
     </>
   );

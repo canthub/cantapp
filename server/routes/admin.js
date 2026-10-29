@@ -8,7 +8,7 @@ import { getDb } from '../db.js';
 import {
   listEvents, getEvent, getEventRow, createEvent, updateEvent, deleteEvent, setEventStatus, eventStats,
   eligibleMembers, responsesByMember, listMembers, getMember, saveMember, setMemberActive,
-  reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput, getInvitees, assertPublishable, deadlinePassed,
+  reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput, getInvitees, getEventGuests, assertPublishable, deadlinePassed,
 } from '../models.js';
 import { config } from '../config.js';
 import { deadlineToUtcIso } from '../services/time.js';
@@ -71,7 +71,7 @@ adminRouter.get('/events/:id', (req, res) => {
   const rows = report.rows.map((r) => ({ ...r, reminders: lastReminders.get(r.memberId) || null }));
   const concerts = getDb().prepare(`SELECT id, name, date FROM events WHERE dress_rehearsal_id = ?`).all(id);
   const invitees = report.event.inviteMode === 'selected' ? getInvitees(id) : null;
-  res.json({ event: { ...report.event, invitees }, summary: report.summary, byVoice: report.byVoice, rows, concerts, recipients: reportRecipients() });
+  res.json({ event: { ...report.event, invitees, guests: getEventGuests(id) }, summary: report.summary, byVoice: report.byVoice, rows, concerts, recipients: reportRecipients() });
 });
 
 adminRouter.put('/events/:id', async (req, res) => {

@@ -27,6 +27,12 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
   - A koordinátákat az app az **OpenStreetMap** ingyenes szolgáltatásával keresi meg a háttérben. Ehhez csak az irányítószám és a település kerül át, pontos utcacímet nem kérünk és nem küldünk. A találatokat eltárolja, így minden településre csak egyszer kérdez rá. A szolgáltatás szabályai szerint másodpercenként legfeljebb egy keresést indít, ezért egy nagy tagimport után a koordináták néhány perc alatt töltődnek fel.
   - Kikapcsolható a `GEOCODING=off` beállítással.
 
+**Kisegítő művészek (külsősök)**
+- Harmadik tagi kategória a két kórus mellett: a tagnál a *„Kisegítő művész (külsős)”* jelöléssel (vagy a tagimportban a *Kisegítő művész* oszloppal). Kisegítő művész nem lehet egyben kórustag.
+- A kórus eseményeire nem kapnak automatikusan meghívást: az eseménynél a *Kisegítő művészek* listában kell őket **egyenként** kijelölni (szólam/hangszer szerint csoportosítva, a közel lakók elöl). Csak ezeket az eseményeket látják, csak ezekről kapnak értesítést és emlékeztetőt, és a riportban „Kisegítő művész”-ként szerepelnek. Ha közzététel után kikerülnek a listáról, ugyanazt az üzenetet kapják, mint a kórustagok.
+- Az eseményeket **egyenként menthetik a naptárukba**: az esemény oldalán a *„Mentés a naptárba”* részben egy .ics fájllal (iPhone, Outlook, egyéb naptárak) vagy Google Naptár linkkel. A link a tag titkos naptárkulcsát használja, így bejelentkezés nélkül is megnyílik.
+- Ha a tagimport táblázatában nincs *Kisegítő művész* oszlop (pl. csak a kórustagok listája), a meglévő kisegítők besorolása megmarad, és a „nem szereplők inaktiválása” sem érinti őket.
+
 **Automatikus értesítések** (az appban, push értesítésként a telefonon és e-mailben):
 
 | Mikor | Kinek | Mit |
@@ -49,7 +55,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 ## Import sablonok
 
 A `templates/` mappában (és az admin felületen letölthetően):
-- `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Irányítószám, Lakóhely (település), Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Admin (igen/nem).
+- `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Irányítószám, Lakóhely (település), Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Kisegítő művész (igen/nem), Admin (igen/nem).
 - `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Utolsó nap, Kezdés, Befejezés, Típus, Van főpróbája, Énekkar, Turné, Szálláskérés, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
 
 Az Excel-sablonok második munkalapján kitöltési útmutató található.

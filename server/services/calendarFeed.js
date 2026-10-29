@@ -74,42 +74,89 @@ const VTIMEZONE = [
   'END:VTIMEZONE',
 ];
 
-function eventLines(ev, response, now) {
+// Az esemény kezdete és vége (luxon DateTime), illetve egész napos eseménynél a napok.
+function eventSpan(ev) {
+  const lastDay = ev.endDate || ev.date;
+  if (!ev.startTime) {
+    return { allDay: true, start: DateTime.fromISO(ev.date, { zone: TZ }), end: DateTime.fromISO(lastDay, { zone: TZ }).plus({ days: 1 }) };
+  }
+  const start = DateTime.fromISO(`${ev.date}T${ev.startTime}`, { zone: TZ });
+  let end = ev.endTime
+    ? DateTime.fromISO(`${lastDay}T${ev.endTime}`, { zone: TZ })
+    : DateTime.fromISO(`${lastDay}T${ev.startTime}`, { zone: TZ }).plus({ hours: DEFAULT_DURATION_HOURS });
+  if (end <= start) end = end.plus({ days: 1 }); // éjfélen átnyúló esemény
+  return { allDay: false, start, end };
+}
+
+const eventLocation = (ev) => [ev.venue, ev.address, ev.city, ev.country].filter(Boolean).join(', ');
+const eventLink = (ev) => `${config.appUrl}/#/esemeny/${ev.id}`;
+
+// single: egyetlen esemény naptárba mentése (nem frissül), ezért a címben és a leírásban nincs a pillanatnyi válasz.
+function eventLines(ev, response, now, { single = false } = {}) {
   const status = response?.status || 'none';
   const lines = ['BEGIN:VEVENT', `UID:event-${ev.id}@cantapp`, `DTSTAMP:${utcStamp(now.toISOString())}`];
-  const lastDay = ev.endDate || ev.date;
-  if (ev.startTime) {
-    const start = DateTime.fromISO(`${ev.date}T${ev.startTime}`, { zone: TZ });
-    let end = ev.endTime
-      ? DateTime.fromISO(`${lastDay}T${ev.endTime}`, { zone: TZ })
-      : DateTime.fromISO(`${lastDay}T${ev.startTime}`, { zone: TZ }).plus({ hours: DEFAULT_DURATION_HOURS });
-    if (end <= start) end = end.plus({ days: 1 }); // éjfélen átnyúló esemény
-    lines.push(`DTSTART;TZID=${TZ}:${localStamp(start)}`, `DTEND;TZID=${TZ}:${localStamp(end)}`);
+  const span = eventSpan(ev);
+  if (span.allDay) {
+    lines.push(`DTSTART;VALUE=DATE:${span.start.toFormat('yyyyLLdd')}`, `DTEND;VALUE=DATE:${span.end.toFormat('yyyyLLdd')}`);
   } else {
-    const day = DateTime.fromISO(ev.date, { zone: TZ });
-    const after = DateTime.fromISO(lastDay, { zone: TZ }).plus({ days: 1 });
-    lines.push(`DTSTART;VALUE=DATE:${day.toFormat('yyyyLLdd')}`, `DTEND;VALUE=DATE:${after.toFormat('yyyyLLdd')}`);
+    lines.push(`DTSTART;TZID=${TZ}:${localStamp(span.start)}`, `DTEND;TZID=${TZ}:${localStamp(span.end)}`);
   }
   const cancelled = ev.status === 'cancelled';
-  lines.push(`SUMMARY:${escapeText(`${cancelled ? '🚫 ELMARAD: ' : `${PREFIX[status]} `}${ev.name}`)}`);
-  const location = [ev.venue, ev.address, ev.city, ev.country].filter(Boolean).join(', ');
+  const prefix = cancelled ? '🚫 ELMARAD: ' : single ? '' : `${PREFIX[status]} `;
+  lines.push(`SUMMARY:${escapeText(`${prefix}${ev.name}`)}`);
+  const location = eventLocation(ev);
   if (location) lines.push(`LOCATION:${escapeText(location)}`);
-  const link = `${config.appUrl}/#/esemeny/${ev.id}`;
-  const description = [
-    `${ev.typeLabel}${ev.isTour ? ' (koncertturné)' : ''} – ${ev.choirs.map((c) => CHOIRS[c]).join(', ')}`,
-    `Visszajelzésed: ${status === 'none' ? 'még nincs' : RESPONSES[status]}${ev.accommodation && response?.accommodation ? ' (szállást kértél)' : ''}`,
-    ev.isOpen ? `Visszajelzési határidő: ${formatIsoHu(ev.deadlineAt)}` : null,
-    ev.notes ? `\n${ev.notes}` : null,
-    `\nVisszajelzés és részletek az appban: ${link}`,
-  ].filter(Boolean).join('\n');
-  lines.push(`DESCRIPTION:${escapeText(description)}`, `URL:${link}`);
-  lines.push(`STATUS:${cancelled ? 'CANCELLED' : status === 'maybe' || status === 'none' ? 'TENTATIVE' : 'CONFIRMED'}`);
+  const link = eventLink(ev);
+  lines.push(`DESCRIPTION:${escapeText(eventDescription(ev, single ? null : { status, response }))}`, `URL:${link}`);
+  lines.push(`STATUS:${cancelled ? 'CANCELLED' : single || status === 'yes' || status === 'no' ? 'CONFIRMED' : 'TENTATIVE'}`);
   // Ha nem vesz részt, ne foglalja a naptárát.
-  lines.push(`TRANSP:${status === 'no' || cancelled ? 'TRANSPARENT' : 'OPAQUE'}`);
+  lines.push(`TRANSP:${(!single && status === 'no') || cancelled ? 'TRANSPARENT' : 'OPAQUE'}`);
   const modified = [ev.updatedAt, response?.updated_at].filter(Boolean).sort().pop();
   if (modified) lines.push(`LAST-MODIFIED:${utcStamp(modified)}`);
   lines.push('END:VEVENT');
   return lines;
+}
+
+function eventDescription(ev, answer) {
+  return [
+    `${ev.typeLabel}${ev.isTour ? ' (koncertturné)' : ''} – ${ev.choirs.map((c) => CHOIRS[c]).join(', ')}`,
+    answer ? `Visszajelzésed: ${answer.status === 'none' ? 'még nincs' : RESPONSES[answer.status]}${ev.accommodation && answer.response?.accommodation ? ' (szállást kértél)' : ''}` : null,
+    ev.isOpen ? `Visszajelzési határidő: ${formatIsoHu(ev.deadlineAt)}` : null,
+    ev.notes ? `\n${ev.notes}` : null,
+    `\nVisszajelzés és részletek az appban: ${eventLink(ev)}`,
+  ].filter(Boolean).join('\n');
+}
+
+// ---------------------------------------------------------------- Egy esemény naptárba mentése
+
+// Kisegítő művészeknek: az eseményeket egyenként menthetik a naptárukba (.ics fájl vagy Google Naptár link).
+// A link a tag titkos naptárkulcsát használja, így a telefon naptára bejelentkezés nélkül is megnyitja.
+export function singleEventUrls(token, ev) {
+  const span = eventSpan(ev);
+  const fmt = span.allDay ? 'yyyyLLdd' : "yyyyLLdd'T'HHmmss";
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: ev.name,
+    dates: `${span.start.toFormat(fmt)}/${span.end.toFormat(fmt)}`,
+    details: eventDescription(ev, null),
+    location: eventLocation(ev),
+  });
+  if (!span.allDay) params.set('ctz', TZ);
+  return {
+    icsUrl: `${config.appUrl}/api/calendar/${token}/event-${ev.id}.ics`,
+    googleUrl: `https://calendar.google.com/calendar/render?${params}`,
+  };
+}
+
+export function buildSingleEventCalendar(eventId, now = new Date()) {
+  const ev = getEvent(eventId, now);
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cantemus Korus//cantapp//HU', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    ...VTIMEZONE,
+    ...eventLines(ev, null, now, { single: true }),
+    'END:VCALENDAR',
+  ];
+  return `${lines.map(foldLine).join('\r\n')}\r\n`;
 }
 
 // A tag naptárába kerülő események: közzétett (vagy utólag lemondott), legfeljebb 60 napja volt, és meg van rá hívva.
@@ -124,7 +171,8 @@ function memberCalendarRows(memberId, now) {
 // A Profil oldalon megjelenő állapot: hány esemény kerül a naptárba, és ha egy sem, miért.
 export function calendarStatus(memberId, now = new Date()) {
   const choirs = getDb().prepare('SELECT COUNT(*) AS n FROM member_choirs WHERE member_id = ?').get(memberId).n;
-  return { eventCount: memberCalendarRows(memberId, now).length, hasChoir: choirs > 0 };
+  const guest = Boolean(getDb().prepare('SELECT is_guest FROM members WHERE id = ?').get(memberId)?.is_guest);
+  return { eventCount: memberCalendarRows(memberId, now).length, hasChoir: choirs > 0 || guest };
 }
 
 export function buildMemberCalendar(memberId, now = new Date()) {

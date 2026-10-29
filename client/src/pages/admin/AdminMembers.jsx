@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { api, toast } from '../../api.js';
-import { CHOIRS } from '../../../../shared/constants.js';
+import { CHOIRS, GUEST_LABEL, GUESTS_LABEL } from '../../../../shared/constants.js';
 import { TopBar, Spinner, Empty, Modal, useLoad } from '../../components/ui.jsx';
 import { choirNames } from '../../util.js';
 import { AdminNav } from './AdminEvents.jsx';
 
-const EMPTY = { lastName: '', firstName: '', email: '', phone: '', voicePart: '', postalCode: '', homeCity: '', choirs: [], isAdmin: false, active: true };
+const EMPTY = { lastName: '', firstName: '', email: '', phone: '', voicePart: '', postalCode: '', homeCity: '', choirs: [], isAdmin: false, isGuest: false, active: true };
 
 function MemberModal({ member, me, onClose }) {
   const [form, setForm] = useState(member || EMPTY);
@@ -49,7 +49,7 @@ function MemberModal({ member, me, onClose }) {
         <label className="field"><span>E-mail *</span><input type="email" required value={form.email} onChange={set('email')} /></label>
         <div className="grid2">
           <label className="field"><span>Telefon</span><input type="tel" value={form.phone} onChange={set('phone')} /></label>
-          <label className="field"><span>Szólam</span><input type="text" value={form.voicePart} onChange={set('voicePart')} placeholder="pl. Szoprán 1" /></label>
+          <label className="field"><span>{form.isGuest ? 'Szólam / hangszer' : 'Szólam'}</span><input type="text" value={form.voicePart} onChange={set('voicePart')} placeholder={form.isGuest ? 'pl. Tenor, hegedű' : 'pl. Szoprán 1'} /></label>
         </div>
         <div className="grid2" style={{ gridTemplateColumns: '1fr 2fr' }}>
           <label className="field"><span>Irányítószám</span><input type="text" inputMode="numeric" value={form.postalCode} onChange={set('postalCode')} placeholder="4400" /></label>
@@ -57,14 +57,16 @@ function MemberModal({ member, me, onClose }) {
         </div>
         <p className="hint" style={{ marginTop: -6 }}>Ebből számoljuk, ki lakik közel egy esemény helyszínéhez. Pontos utcacím nem kell.</p>
         {Object.entries(CHOIRS).map(([k, v]) => (
-          <label key={k} className="check"><input type="checkbox" checked={form.choirs.includes(k)} onChange={() => toggleChoir(k)} />{v}</label>
+          <label key={k} className="check" style={form.isGuest ? { opacity: 0.5 } : undefined}><input type="checkbox" disabled={form.isGuest} checked={!form.isGuest && form.choirs.includes(k)} onChange={() => toggleChoir(k)} />{v}</label>
         ))}
+        <label className="check"><input type="checkbox" checked={form.isGuest} onChange={set('isGuest')} />🎻 {GUEST_LABEL} (külsős)</label>
+        {form.isGuest && <p className="hint" style={{ marginTop: -4 }}>Nem kórustag: a kórus eseményeire nem kap automatikusan meghívást, csak azokra, amelyekre az eseménynél egyenként kijelölöd. Csak ezeket az eseményeket látja, és egyenként mentheti őket a naptárába.</p>}
         <label className="check"><input type="checkbox" checked={form.isAdmin} disabled={member?.id === me.member.id} onChange={set('isAdmin')} />Admin (eseményeket és tagokat kezelhet)</label>
         {error && <div className="notice err">{error}</div>}
         <button className="btn primary block" disabled={busy}>Mentés</button>
         {member && member.id !== me.member.id && (
           member.active
-            ? <button type="button" className="btn danger block" style={{ marginTop: 8 }} onClick={() => setActive(false)}>Inaktiválás (kilépett a kórusból)</button>
+            ? <button type="button" className="btn danger block" style={{ marginTop: 8 }} onClick={() => setActive(false)}>{member.isGuest ? 'Inaktiválás' : 'Inaktiválás (kilépett a kórusból)'}</button>
             : <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={() => setActive(true)}>Újraaktiválás</button>
         )}
       </form>
@@ -126,7 +128,7 @@ export default function AdminMembers({ me }) {
     const needle = q.trim().toLowerCase();
     const members = data.members
       .filter((m) => showInactive || m.active)
-      .filter((m) => choir === 'all' || m.choirs.includes(choir))
+      .filter((m) => choir === 'all' || (choir === 'guest' ? m.isGuest : m.choirs.includes(choir)))
       .filter((m) => !needle || `${m.name} ${m.email} ${m.voicePart}`.toLowerCase().includes(needle));
     list = members.length === 0 ? <Empty icon="👥">Nincs találat.</Empty> : (
       <div className="card">
@@ -135,8 +137,8 @@ export default function AdminMembers({ me }) {
           <div key={m.id} className="member-row" onClick={() => setEditing(m)} style={m.active ? undefined : { opacity: 0.5 }}>
             <div className="avatar">{(m.lastName[0] || '') + (m.firstName[0] || '')}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div><b>{m.name}</b>{m.isAdmin && <span className="badge t-koncert" style={{ marginLeft: 6 }}>Admin</span>}{!m.active && <span className="badge draft" style={{ marginLeft: 6 }}>Inaktív</span>}</div>
-              <div className="small muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{[m.voicePart, choirNames(m.choirs)].filter(Boolean).join(' · ')}</div>
+              <div><b>{m.name}</b>{m.isAdmin && <span className="badge t-koncert" style={{ marginLeft: 6 }}>Admin</span>}{!m.active && <span className="badge draft" style={{ marginLeft: 6 }}>Inaktív</span>}{m.isGuest && <span className="badge" style={{ marginLeft: 6 }}>🎻 {GUEST_LABEL}</span>}</div>
+              <div className="small muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{[m.voicePart, m.isGuest ? null : choirNames(m.choirs)].filter(Boolean).join(' · ')}</div>
               <div className="small muted">{m.email}</div>
               {(m.postalCode || m.homeCity) && <div className="small muted">📍 {[m.postalCode, m.homeCity].filter(Boolean).join(' ')}</div>}
             </div>
@@ -159,6 +161,7 @@ export default function AdminMembers({ me }) {
         <div className="tabs">
           <button className={choir === 'all' ? 'active' : ''} onClick={() => setChoir('all')}>Mindenki</button>
           {Object.entries(CHOIRS).map(([k, v]) => <button key={k} className={choir === k ? 'active' : ''} onClick={() => setChoir(k)}>{v}</button>)}
+          <button className={choir === 'guest' ? 'active' : ''} onClick={() => setChoir('guest')}>{GUESTS_LABEL}</button>
         </div>
         <label className="check"><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />Inaktív tagok mutatása</label>
         {error && <div className="notice err">{error.message}</div>}
