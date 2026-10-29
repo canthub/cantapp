@@ -29,6 +29,7 @@ export default function Events({ me }) {
   const [choir, setChoir] = useState('all');
   const [data, error, reload] = useLoad(() => api('/events'), []);
   const inBoth = me.member.choirs.length > 1;
+  const { isGuest } = me.member;
 
   let content;
   if (error) content = <div className="notice err">{error.message} <button className="btn small" onClick={reload}>Újra</button></div>;
@@ -42,7 +43,7 @@ export default function Events({ me }) {
     else events = events.filter((e) => e.date < today).reverse();
     content = events.length === 0
       ? <Empty icon={tab === 'todo' ? '🎉' : '🎵'}>{tab === 'todo' ? 'Minden eseményre visszajeleztél. Köszönjük!' : 'Nincs megjeleníthető esemény.'}</Empty>
-      : events.map((ev) => <EventCard key={ev.id} ev={ev} showChoirs={inBoth} />);
+      : events.map((ev) => <EventCard key={ev.id} ev={ev} showChoirs={inBoth || isGuest} />);
     if (tab !== 'todo' && todo.length > 0) {
       content = (
         <>
@@ -64,6 +65,7 @@ export default function Events({ me }) {
           <button className={tab === 'todo' ? 'active' : ''} onClick={() => setTab('todo')}>Visszajelzésre vár</button>
           <button className={tab === 'past' ? 'active' : ''} onClick={() => setTab('past')}>Korábbi</button>
         </div>
+        {isGuest && <p className="hint" style={{ marginTop: 0 }}>🎻 Kisegítő művészként azokat az eseményeket látod, amelyekre meghívtunk. Mindegyiket egyenként elmentheted a naptáradba az esemény oldalán.</p>}
         {inBoth && (
           <div className="tabs">
             <button className={choir === 'all' ? 'active' : ''} onClick={() => setChoir('all')}>Mindkét kórus</button>

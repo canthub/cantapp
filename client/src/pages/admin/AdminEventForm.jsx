@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api, toast } from '../../api.js';
 import { navigate } from '../../router.js';
-import { CHOIRS, EVENT_TYPES, UNINVITED_MESSAGE, HOME_CITY, DEFAULT_DEADLINE_DAYS, accommodationAllowed, isMultiDay } from '../../../../shared/constants.js';
+import { CHOIRS, EVENT_TYPES, UNINVITED_MESSAGE, HOME_CITY, DEFAULT_DEADLINE_DAYS, GUESTS_LABEL, accommodationAllowed, isMultiDay } from '../../../../shared/constants.js';
 import { TopBar, Spinner } from '../../components/ui.jsx';
 import InvitePicker from '../../components/InvitePicker.jsx';
 import { formatDate, todayIso } from '../../util.js';
 
 const EMPTY = {
   name: '', type: 'proba', date: '', startTime: '', endTime: '', country: 'Magyarország', city: '', address: '', venue: '',
-  isTour: false, deadlineDate: '', deadlineTime: '23:59', dressRehearsalId: '', notes: '', choirs: [], inviteMode: 'all', invitees: [],
+  isTour: false, deadlineDate: '', deadlineTime: '23:59', dressRehearsalId: '', notes: '', choirs: [], inviteMode: 'all', invitees: [], guests: [],
   endDate: '', accommodation: false,
 };
 
@@ -43,7 +43,7 @@ export default function AdminEventForm({ id }) {
           name: e.name, type: e.type, date: e.date, startTime: e.startTime, endTime: e.endTime, country: e.country, city: e.city,
           address: e.address, venue: e.venue, isTour: e.isTour, deadlineDate: e.deadlineDate, deadlineTime: e.deadlineTime,
           dressRehearsalId: e.dressRehearsalId || '', notes: e.notes, choirs: e.choirs,
-          inviteMode: e.inviteMode, invitees: e.invitees || [],
+          inviteMode: e.inviteMode, invitees: e.invitees || [], guests: e.guests || [],
           endDate: e.endDate || '', accommodation: e.accommodation,
         };
         setInvitedBefore(rows.map((r) => r.memberId));
@@ -58,16 +58,17 @@ export default function AdminEventForm({ id }) {
     if (form?.date && !deadlineTouched) setForm((f) => ({ ...f, deadlineDate: minusDays(f.date, DEFAULT_DEADLINE_DAYS) }));
   }, [form?.date, deadlineTouched]);
 
-  // Meghívottak kijelölésekor a tagok távolsága a helyszíntől (a gépelés után kis késleltetéssel).
+  // Meghívottak (vagy kisegítő művészek) kijelölésekor a tagok távolsága a helyszíntől (a gépelés után kis késleltetéssel).
+  const hasGuests = members.some((m) => m.isGuest);
   useEffect(() => {
-    if (!form || form.inviteMode !== 'selected') return undefined;
+    if (!form || (form.inviteMode !== 'selected' && !hasGuests)) return undefined;
     const t = setTimeout(() => {
       api('/admin/geo/distances', { method: 'POST', body: { address: form.address, city: form.city, country: form.country } })
         .then(setGeo)
         .catch(() => setGeo(null));
     }, 700);
     return () => clearTimeout(t);
-  }, [form?.inviteMode, form?.address, form?.city, form?.country]);
+  }, [form?.inviteMode, form?.address, form?.city, form?.country, hasGuests]);
 
   // Szálláskérés: ha az esemény Nyíregyházán kívüli és több napos, új eseménynél alapból engedélyezett.
   const roomAllowed = form ? accommodationAllowed(form) : false;
@@ -95,7 +96,10 @@ export default function AdminEventForm({ id }) {
   // A kiválasztott kórus(ok) aktív tagjai – közülük lehet meghívottakat kijelölni.
   const choirMembers = members.filter((m) => m.choirs.some((c) => form.choirs.includes(c)));
   const invitedNow = form.inviteMode === 'all' ? choirMembers.map((m) => m.id) : form.invitees.filter((mid) => choirMembers.some((m) => m.id === mid));
-  const removedNames = isPublished ? members.filter((m) => invitedBefore.includes(m.id) && !invitedNow.includes(m.id)).map((m) => m.name) : [];
+  // Kisegítő művészek: csak az egyenként kijelöltek kapnak meghívást.
+  const guestMembers = members.filter((m) => m.isGuest);
+  const guestsNow = form.guests.filter((mid) => guestMembers.some((m) => m.id === mid));
+  const removedNames = isPublished ? members.filter((m) => invitedBefore.includes(m.id) && !invitedNow.includes(m.id) && !guestsNow.includes(m.id)).map((m) => m.name) : [];
   const copyCandidates = events.filter((e) => String(e.id) !== String(id) && e.choirs.some((c) => form.choirs.includes(c)));
 
   const copyInvitees = async (eventId) => {
@@ -104,8 +108,9 @@ export default function AdminEventForm({ id }) {
     try {
       const { rows } = await api(`/admin/events/${eventId}`);
       const ids = rows.map((r) => r.memberId).filter((mid) => choirMembers.some((m) => m.id === mid));
-      setForm((f) => ({ ...f, inviteMode: 'selected', invitees: ids }));
-      toast(`${ids.length} meghívott átmásolva.`);
+      const guestIds = rows.map((r) => r.memberId).filter((mid) => guestMembers.some((m) => m.id === mid));
+      setForm((f) => ({ ...f, inviteMode: 'selected', invitees: ids, guests: guestIds }));
+      toast(`${ids.length + guestIds.length} meghívott átmásolva.`);
     } catch (err) {
       toast(err.message, 'err');
     }
@@ -115,7 +120,7 @@ export default function AdminEventForm({ id }) {
     setBusy(true);
     setError('');
     try {
-      const body = { ...form, dressRehearsalId: form.dressRehearsalId || null, invitees: form.inviteMode === 'selected' ? invitedNow : [] };
+      const body = { ...form, dressRehearsalId: form.dressRehearsalId || null, invitees: form.inviteMode === 'selected' ? invitedNow : [], guests: guestsNow };
       if (removedNames.length && !confirm(`${removedNames.length} tag kikerül a meghívottak közül, és ezt az üzenetet kapja:\n\n„${UNINVITED_MESSAGE}”\n\nFolytatod?`)) {
         setBusy(false);
         return;
@@ -185,6 +190,16 @@ export default function AdminEventForm({ id }) {
               {geo && !geo.located && (form.address || form.city) && <p className="hint">A helyszínt nem találtuk a térképen, ezért név szerint rendezünk. Ellenőrizd a címet és a várost!</p>}
               {!form.address && !form.city && <p className="hint">Add meg a helyszín címét vagy városát, és a közel lakók kerülnek előre.</p>}
               <InvitePicker members={choirMembers} value={invitedNow} distances={geo?.located ? geo.distances : null} onChange={(ids) => setForm((f) => ({ ...f, invitees: ids }))} />
+            </div>
+          )}
+
+          <h3 style={{ marginTop: 8 }}>🎻 {GUESTS_LABEL}</h3>
+          {guestMembers.length === 0 ? (
+            <p className="hint">Még nincs kisegítő művész felvéve. A Tagok oldalon a tagnál jelöld be: „Kisegítő művész (külsős)”.</p>
+          ) : (
+            <div className="field">
+              <p className="hint">Külsős kisegítők, akiket egyenként hívsz meg erre az eseményre. Csak a kijelöltek látják az eseményt, kapnak értesítést és emlékeztetőt, és menthetik a naptárukba.</p>
+              <InvitePicker members={guestMembers} value={guestsNow} distances={geo?.located ? geo.distances : null} onChange={(ids) => setForm((f) => ({ ...f, guests: ids }))} />
             </div>
           )}
           {removedNames.length > 0 && (

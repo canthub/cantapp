@@ -4,6 +4,7 @@ import { TopBar } from '../components/ui.jsx';
 import CalendarCard from '../components/CalendarCard.jsx';
 import { pushSupported, currentSubscription, enablePush, disablePush } from '../push.js';
 import { choirNames, isIos, isStandalone } from '../util.js';
+import { GUEST_LABEL } from '../../../shared/constants.js';
 
 export default function Profile({ me }) {
   const m = me.member;
@@ -51,6 +52,7 @@ export default function Profile({ me }) {
           {m.phone && <p className="muted" style={{ margin: 0 }}>{m.phone}</p>}
           <div className="badges" style={{ marginTop: 10 }}>
             {m.choirs.length > 0 && <span className="badge">{choirNames(m.choirs)}</span>}
+            {m.isGuest && <span className="badge">🎻 {GUEST_LABEL}</span>}
             {m.voicePart && <span className="badge">{m.voicePart}</span>}
             {m.isAdmin && <span className="badge t-koncert">Admin</span>}
           </div>
@@ -74,7 +76,12 @@ export default function Profile({ me }) {
           )}
         </div>
 
-        <CalendarCard isAdmin={m.isAdmin} />
+        {m.isGuest ? (
+          <div className="card">
+            <h2>📅 Naptár</h2>
+            <p className="small" style={{ marginBottom: 0 }}>Az eseményeket egyenként mentheted a naptáradba: nyisd meg az eseményt, és koppints a <b>„Mentés a naptárba”</b> részben a telefonodnak megfelelő gombra.</p>
+          </div>
+        ) : <CalendarCard isAdmin={m.isAdmin} />}
 
         {!isStandalone() && (
           <div className="card">

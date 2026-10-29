@@ -158,6 +158,13 @@ const MIGRATIONS = [
   `ALTER TABLE events ADD COLUMN end_date TEXT NOT NULL DEFAULT '';
   ALTER TABLE events ADD COLUMN accommodation INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE responses ADD COLUMN accommodation INTEGER NOT NULL DEFAULT 0;`,
+  // Kisegítő művészek (külsősök): nem tartoznak kórushoz, csak az event_guests-ben felsorolt eseményekre hívjuk meg őket.
+  `ALTER TABLE members ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;
+  CREATE TABLE event_guests (
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    PRIMARY KEY (event_id, member_id)
+  );`,
 ];
 
 export function openDb(file) {

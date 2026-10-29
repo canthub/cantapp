@@ -118,6 +118,8 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
   const rows = await readTable(buffer, filename);
   const result = { created: 0, updated: 0, deactivated: 0, errors: [] };
   const seen = new Map(); // e-mail → sor száma
+  // Ha a táblázatban nincs „Kisegítő művész” oszlop (pl. csak a kórustagok listája), a kisegítőket nem inaktiváljuk.
+  const hasGuestColumn = rows.some((row) => pick(row, 'Kisegítő művész', 'Kisegítő', 'Külsős') !== '');
   tx(() => {
     rows.forEach((row, i) => {
       const line = i + 2;
@@ -149,6 +151,10 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
           isAdmin: config.adminEmails.includes(email) || (pick(row, 'Admin', 'Adminisztrátor') === ''
             ? Boolean(getDb().prepare('SELECT is_admin FROM members WHERE email = ?').get(email)?.is_admin)
             : parseBool(pick(row, 'Admin', 'Adminisztrátor'))),
+          // Üres „Kisegítő művész” cella: a meglévő besorolás marad.
+          isGuest: pick(row, 'Kisegítő művész', 'Kisegítő', 'Külsős') === ''
+            ? Boolean(getDb().prepare('SELECT is_guest FROM members WHERE email = ?').get(email)?.is_guest)
+            : parseBool(pick(row, 'Kisegítő művész', 'Kisegítő', 'Külsős')),
           choirs,
           active: true,
         });
@@ -160,7 +166,7 @@ export async function importMembers(buffer, filename, { deactivateMissing = fals
     });
     if (deactivateMissing && result.errors.length === 0) {
       for (const m of listMembers({ includeInactive: false })) {
-        if (!seen.has(m.email) && !m.isAdmin) {
+        if (!seen.has(m.email) && !m.isAdmin && (hasGuestColumn || !m.isGuest)) {
           setMemberActive(m.id, false);
           result.deactivated++;
         }

@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { getEvent, eligibleMembers, responsesByMember, fullName, reportRecipients } from '../models.js';
 import { getDb } from '../db.js';
-import { CHOIRS, RESPONSE_REPORT_LABELS, EVENT_STATUSES, compareVoices } from '../../shared/constants.js';
+import { CHOIRS, GUEST_LABEL, RESPONSE_REPORT_LABELS, EVENT_STATUSES, compareVoices } from '../../shared/constants.js';
 import { formatDateHu, formatIsoHu } from './time.js';
 import { sendMail, emailLayout, esc } from './mailer.js';
 
@@ -19,7 +19,8 @@ export function buildReport(eventId, now = new Date()) {
       memberId: m.id,
       name: fullName(m),
       voicePart: m.voice_part,
-      choirs: choirsStmt.all(m.id).map((c) => CHOIRS[c.choir]).join(', '),
+      choirs: m.is_guest ? GUEST_LABEL : choirsStmt.all(m.id).map((c) => CHOIRS[c.choir]).join(', '),
+      isGuest: Boolean(m.is_guest),
       email: m.email,
       phone: m.phone,
       status,

@@ -137,14 +137,16 @@ test('teljes folyamat: közzététel, visszajelzés, főpróba-szabály, emléke
 test('tagok importja a sablonból', async () => {
   const result = await importMembers(fs.readFileSync('templates/tagok_import_sablon.xlsx'), 'tagok_import_sablon.xlsx');
   assert.deepEqual(result.errors, []);
-  assert.equal(result.created + result.updated, 3);
+  assert.equal(result.created + result.updated, 4);
+  const toth = getDb().prepare(`SELECT id, is_guest FROM members WHERE email = 'toth.gabor@example.com'`).get();
+  assert.equal(toth.is_guest, 1, 'kisegítő művész');
   const nagy = getDb().prepare(`SELECT id FROM members WHERE email = 'nagy.peter@example.com'`).get();
   const choirs = getDb().prepare('SELECT choir FROM member_choirs WHERE member_id = ? ORDER BY choir').all(nagy.id).map((r) => r.choir);
   assert.deepEqual(choirs, ['cantemus', 'promusica']);
 
   const csv = await importMembers(fs.readFileSync('templates/tagok_import_sablon.csv'), 'tagok.csv');
   assert.deepEqual(csv.errors, []);
-  assert.equal(csv.updated, 3);
+  assert.equal(csv.updated, 4);
 
   const bad = await importMembers(Buffer.from('Vezetéknév;Keresztnév;E-mail;Cantemus Vegyeskar;Pro Musica\nTeszt;Elek;nem-email;igen;nem\n'), 'x.csv');
   assert.equal(bad.errors.length, 1);

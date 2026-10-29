@@ -8,7 +8,9 @@ import { getMemberByEmail, getEventRow, getEvent, serializeEvent, isEligible, ge
 import { setResponse, concertRuleAllows, concertRuleMessage } from '../services/rsvp.js';
 import { saveSubscription, removeSubscription } from '../services/push.js';
 import { sendMail, emailLayout, esc } from '../services/mailer.js';
-import { getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar, calendarStatus } from '../services/calendarFeed.js';
+import {
+  getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar, calendarStatus, singleEventUrls, buildSingleEventCalendar,
+} from '../services/calendarFeed.js';
 
 export const memberRouter = Router();
 
@@ -56,10 +58,13 @@ memberRouter.get('/me', requireMember, (req, res) => {
 
 // ---------------------------------------------------------------- Események
 
-function memberView(row, memberId, now = new Date()) {
+function memberView(row, member, now = new Date()) {
+  const memberId = member.id;
   const ev = serializeEvent(row, now);
   // Mindenki látja a kórusa eseményeit, de visszajelezni csak a meghívottak tudnak.
   ev.invited = isEligible(row.id, memberId);
+  // A kisegítő művészek az eseményt egyenként menthetik a naptárukba.
+  if (member.isGuest && ev.invited && row.status !== 'draft') ev.calendar = singleEventUrls(getCalendarToken(memberId), ev);
   const response = getResponse(row.id, memberId);
   ev.myResponse = response?.status || null;
   ev.myAccommodation = Boolean(response?.accommodation);
@@ -78,24 +83,27 @@ function memberView(row, memberId, now = new Date()) {
   return ev;
 }
 
+// A kórustag a kórusa minden eseményét látja; a kisegítő művész csak azokat, amelyekre meghívták.
+const canSee = (member, ev) => (member.isGuest ? isEligible(ev.id, member.id) : ev.choirs.some((c) => member.choirs.includes(c)));
+
 memberRouter.get('/events', requireMember, (req, res) => {
-  const events = listEvents({ statuses: ['published', 'cancelled'], choirs: req.member.choirs })
-    .map((e) => memberView(getEventRow(e.id), req.member.id));
+  const events = listEvents({ statuses: ['published', 'cancelled'] })
+    .filter((e) => canSee(req.member, e))
+    .map((e) => memberView(getEventRow(e.id), req.member));
   res.json({ events });
 });
 
 memberRouter.get('/events/:id', requireMember, (req, res) => {
   const row = getEventRow(Number(req.params.id));
-  const ownChoir = row && getEvent(row.id).choirs.some((c) => req.member.choirs.includes(c));
-  const visible = row && (row.status !== 'draft' || req.member.isAdmin) && (ownChoir || req.member.isAdmin);
+  const visible = row && (row.status !== 'draft' || req.member.isAdmin) && (req.member.isAdmin || canSee(req.member, getEvent(row.id)));
   if (!visible) return res.status(404).json({ error: 'Az esemény nem található.' });
-  res.json({ event: memberView(row, req.member.id) });
+  res.json({ event: memberView(row, req.member) });
 });
 
 memberRouter.put('/events/:id/response', requireMember, async (req, res) => {
   const id = Number(req.params.id);
   const result = await setResponse(id, req.member.id, req.body?.status, { accommodation: req.body?.accommodation });
-  res.json({ ...result, event: memberView(getEventRow(id), req.member.id) });
+  res.json({ ...result, event: memberView(getEventRow(id), req.member) });
 });
 
 // ---------------------------------------------------------------- Értesítések
@@ -122,6 +130,20 @@ memberRouter.get('/calendar/:file', (req, res) => {
   res.setHeader('Content-Disposition', 'inline; filename="cantemus-korus.ics"');
   res.setHeader('Cache-Control', 'private, max-age=300');
   res.send(buildMemberCalendar(member.id));
+});
+
+// Egyetlen esemény naptárba mentése (kisegítő művészeknek): /api/calendar/<kulcs>/event-<id>.ics
+memberRouter.get('/calendar/:token/:file', (req, res) => {
+  const member = memberByCalendarToken(req.params.token);
+  const id = Number(/^event-(\d+)\.ics$/.exec(req.params.file)?.[1]);
+  const row = member && id ? getEventRow(id) : null;
+  if (!row || row.status === 'draft' || !isEligible(row.id, member.id)) {
+    return res.status(404).type('text/plain').send('Ez az esemény nem található, vagy már nem vagy rá meghívva.');
+  }
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `inline; filename="esemeny-${row.id}.ics"`);
+  res.setHeader('Cache-Control', 'private, no-cache');
+  res.send(buildSingleEventCalendar(row.id));
 });
 
 memberRouter.get('/calendar-link', requireMember, (req, res) => {
