@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { getEvent, eligibleMembers, responsesByMember, fullName, reportRecipients } from '../models.js';
 import { getDb } from '../db.js';
 import { CHOIRS, GUEST_LABEL, RESPONSE_REPORT_LABELS, EVENT_STATUSES, compareVoices } from '../../shared/constants.js';
-import { formatDateHu, formatIsoHu } from './time.js';
+import { formatIsoHu, eventWhenHu } from './time.js';
 import { sendMail, emailLayout, esc } from './mailer.js';
 
 const STATUS_ORDER = { yes: 0, maybe: 1, no: 2, none: 3 };
@@ -47,12 +47,11 @@ export function buildReport(eventId, now = new Date()) {
 }
 
 function eventInfoLines(ev) {
-  const time = ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : '';
   return [
     ['Esemény', ev.name],
     ['Típus', ev.typeLabel + (ev.isTour ? ' (koncertturné)' : '')],
     ['Énekkar', ev.choirs.map((c) => CHOIRS[c]).join(', ')],
-    ['Időpont', ev.endDate ? `${formatDateHu(ev.date, ev.startTime)} – ${formatDateHu(ev.endDate, ev.endTime)}` : formatDateHu(ev.date, time)],
+    ['Időpont', eventWhenHu(ev)],
     ['Helyszín', [ev.venue, ev.address, ev.city, ev.country].filter(Boolean).join(', ') || '–'],
     ['Visszajelzési határidő', formatIsoHu(ev.deadlineAt)],
     ['Állapot', ev.isOpen ? 'Visszajelzés folyamatban' : EVENT_STATUSES[ev.status] + (ev.status === 'published' ? ' – lezárva' : '')],

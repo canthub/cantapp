@@ -1,16 +1,12 @@
 import { CHOIRS, article, missedMessage, THANK_YOU_MESSAGE, UNINVITED_MESSAGE } from '../../shared/constants.js';
-import { formatDateHu, formatIsoHu } from './time.js';
+import { eventWhenHu, formatIsoHu } from './time.js';
 import { esc } from './mailer.js';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const eventUrl = (ev) => `/#/esemeny/${ev.id}`;
 
-function when(ev) {
-  if (ev.endDate) return `${formatDateHu(ev.date, ev.startTime)} – ${formatDateHu(ev.endDate, ev.endTime)}`;
-  const time = ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : '';
-  return formatDateHu(ev.date, time);
-}
+const when = eventWhenHu;
 
 function place(ev) {
   return [ev.venue, ev.address, ev.city, ev.country].filter(Boolean).join(', ');

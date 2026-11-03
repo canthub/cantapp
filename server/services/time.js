@@ -60,6 +60,19 @@ export function formatDateHu(date, time) {
   return time ? `${d} ${time}` : d;
 }
 
+// Az esemény időpontja szövegesen. Több napos eseménynél a kezdés és a befejezés ugyanarra a napra vonatkozik,
+// ezért az első nap mellett áll mindkettő, a napok száma pedig külön: „… 10:00–17:00 · 3 napos esemény (december 5–7.)”.
+export function eventWhenHu(ev) {
+  const time = ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : '';
+  const first = formatDateHu(ev.date, time);
+  if (!ev.endDate || ev.endDate <= ev.date) return first;
+  const a = DateTime.fromISO(ev.date, { zone: TZ }).setLocale('hu');
+  const b = DateTime.fromISO(ev.endDate, { zone: TZ }).setLocale('hu');
+  const days = Math.round(b.diff(a, 'days').days) + 1;
+  const range = a.hasSame(b, 'month') ? `${a.toFormat('LLLL d')}–${b.toFormat('d')}.` : `${a.toFormat('LLLL d.')} – ${b.toFormat('LLLL d.')}`;
+  return `${first} · ${days} napos esemény (${range})`;
+}
+
 export function formatIsoHu(iso) {
   return toLocal(iso).setLocale('hu').toFormat('yyyy. LLLL d. (cccc) HH:mm');
 }

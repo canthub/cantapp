@@ -73,7 +73,7 @@ export default function AdminEvents() {
             <span className="badge">{choirNames(ev.choirs)}</span>
             <StatusBadge ev={ev} />
           </div>
-          <div className="meta">{[dayRange(ev), ev.endDate ? ev.startTime : timeRange(ev), ev.city].filter(Boolean).join(' · ')} · határidő: {formatShortIso(ev.deadlineAt)}</div>
+          <div className="meta">{[dayRange(ev), timeRange(ev), ev.city].filter(Boolean).join(' · ')} · határidő: {formatShortIso(ev.deadlineAt)}</div>
           {ev.status !== 'draft' && <ProgressBar stats={ev.stats} />}
           {ev.status === 'draft' && <div className="meta small">{ev.stats.total} érintett tag</div>}
         </div>

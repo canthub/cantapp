@@ -3,7 +3,7 @@ import { api, toast } from '../../api.js';
 import { navigate } from '../../router.js';
 import { RESPONSES, RESPONSE_REPORT_LABELS } from '../../../../shared/constants.js';
 import { TopBar, Spinner, TypeBadge, Modal, Deadline, useLoad } from '../../components/ui.jsx';
-import { formatDate, timeRange, placeText, choirNames, formatShortIso } from '../../util.js';
+import { formatDate, timeRange, dayRange, dayCount, placeText, choirNames, formatShortIso } from '../../util.js';
 import { StatusBadge } from './AdminEvents.jsx';
 
 function RemindModal({ ev, summary, onClose }) {
@@ -113,9 +113,8 @@ export default function AdminEventDetail({ id }) {
         </div>
 
         <div className="card info">
-          <div className="row"><span className="ico">📅</span><div>{ev.endDate
-            ? <>{formatDate(ev.date)}{ev.startTime && <>, <b>{ev.startTime}</b></>} – {formatDate(ev.endDate)}{ev.endTime && <>, <b>{ev.endTime}</b></>}</>
-            : <>{formatDate(ev.date)}{timeRange(ev) && <>, <b>{timeRange(ev)}</b></>}</>}</div></div>
+          <div className="row"><span className="ico">📅</span><div>{formatDate(ev.date)}{timeRange(ev) && <>, <b style={{ whiteSpace: 'nowrap' }}>{timeRange(ev)}</b></>}
+            {dayCount(ev) > 0 && <div className="small muted">Több napos esemény: {dayCount(ev)} nap ({dayRange(ev)})</div>}</div></div>
           <div className="row"><span className="ico">📍</span><div>{placeText(ev) || '–'}{ev.mapsUrl && <> · <a href={ev.mapsUrl} target="_blank" rel="noreferrer">Térkép</a></>}</div></div>
           <div className="row"><span className="ico">⏰</span><div>Határidő: <Deadline ev={ev} /></div></div>
           {ev.accommodation && <div className="row"><span className="ico">🛏️</span><div>Szálláskérés engedélyezve – <b>{summary.accommodation} tag kér szállást</b></div></div>}

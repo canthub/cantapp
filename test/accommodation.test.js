@@ -68,7 +68,7 @@ test('a tag a válaszával szállást kérhet; „nem” válasznál törlődik;
 test('több napos esemény az értesítésben és a naptár-feliratkozásban', () => {
   const id = createEvent({ ...tour, name: 'Prágai turné' });
   setEventStatus(id, 'published', now);
-  assert.match(changeMessage(getEvent(id)).body, /2027\. március 12\. \(péntek\) 07:00 – 2027\. március 15\. \(hétfő\) 20:00/);
+  assert.match(changeMessage(getEvent(id)).body, /2027\. március 12\. \(péntek\) 07:00–20:00 · 4 napos esemény \(március 12–15\.\)/);
   const allDay = createEvent({ ...tour, name: 'Egész napos tábor', startTime: '', endTime: '', date: '2027-04-01', endDate: '2027-04-03' });
   setEventStatus(allDay, 'published', now);
 
@@ -102,4 +102,13 @@ test('import: utolsó nap és szálláskérés a táblázatból, több napos ese
     'DTSTART;VALUE=DATE:20270701', 'DTEND;VALUE=DATE:20270704', 'SUMMARY:Nyári tábor', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
   const fromCal = await importIcs(ics, { choirs: ['promusica'], from: '2027-06-01', to: '2027-08-01' });
   assert.equal(getEventRow(fromCal.ids[0]).end_date, '2027-07-03');
+});
+
+test('több napos esemény időpontja: a kezdés és a befejezés az első napnál, a napok száma külön', async () => {
+  const { eventWhenHu } = await import('../server/services/time.js');
+  assert.equal(eventWhenHu({ date: '2026-12-05', endDate: '2026-12-07', startTime: '10:00', endTime: '17:00' }),
+    '2026. december 5. (szombat) 10:00–17:00 · 3 napos esemény (december 5–7.)');
+  assert.equal(eventWhenHu({ date: '2026-11-30', endDate: '2026-12-01', startTime: '', endTime: '' }),
+    '2026. november 30. (hétfő) · 2 napos esemény (november 30. – december 1.)');
+  assert.equal(eventWhenHu({ date: '2026-12-05', endDate: '', startTime: '19:00', endTime: '' }), '2026. december 5. (szombat) 19:00');
 });

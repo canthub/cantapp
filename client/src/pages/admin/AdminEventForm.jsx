@@ -160,9 +160,10 @@ export default function AdminEventForm({ id }) {
           </div>
           <label className="field"><span>Utolsó nap (csak több napos eseménynél)</span><input type="date" min={form.date || undefined} value={form.endDate} onChange={set('endDate')} /></label>
           <div className="grid2">
-            <label className="field"><span>{isMultiDay(form) ? 'Kezdés (első nap)' : 'Kezdés'}</span><input type="time" value={form.startTime} onChange={set('startTime')} /></label>
-            <label className="field"><span>{isMultiDay(form) ? 'Befejezés (utolsó nap)' : 'Befejezés'}</span><input type="time" value={form.endTime} onChange={set('endTime')} /></label>
+            <label className="field"><span>Kezdés</span><input type="time" value={form.startTime} onChange={set('startTime')} /></label>
+            <label className="field"><span>Befejezés</span><input type="time" value={form.endTime} onChange={set('endTime')} /></label>
           </div>
+          {isMultiDay(form) && <p className="hint" style={{ marginTop: -6 }}>Több napos eseménynél ide a kezdés és a befejezés időpontját írd (pl. 10:00 és 17:00) – az esemény hosszát az „Utolsó nap” adja meg.</p>}
 
           <div className="field">
             <span className="hint" style={{ fontWeight: 600 }}>Melyik énekkar? *</span>
