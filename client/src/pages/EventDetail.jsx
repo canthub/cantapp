@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, toast } from '../api.js';
 import { RESPONSES, THANK_YOU_MESSAGE } from '../../../shared/constants.js';
 import { TopBar, Spinner, TypeBadge, Deadline, RESPONSE_ICONS, useLoad } from '../components/ui.jsx';
-import { formatDate, timeRange, choirNames } from '../util.js';
+import { formatDate, timeRange, dayRange, dayCount, choirNames } from '../util.js';
 
 export default function EventDetail({ id, onChange }) {
   const [data, error] = useLoad(() => api(`/events/${id}`), [id]);
@@ -44,9 +44,8 @@ export default function EventDetail({ id, onChange }) {
         {event.status === 'cancelled' && <div className="notice err"><b>Ez az esemény elmarad.</b></div>}
 
         <div className="card info">
-          <div className="row"><span className="ico">📅</span><div><div className="lbl">Időpont</div>{event.endDate
-            ? <>{formatDate(event.date)}{event.startTime && <>, <b>{event.startTime}</b></>} – {formatDate(event.endDate)}{event.endTime && <>, <b>{event.endTime}</b></>}</>
-            : <>{formatDate(event.date)}{timeRange(event) && <>, <b>{timeRange(event)}</b></>}</>}</div></div>
+          <div className="row"><span className="ico">📅</span><div><div className="lbl">Időpont</div>{formatDate(event.date)}{timeRange(event) && <>, <b style={{ whiteSpace: 'nowrap' }}>{timeRange(event)}</b></>}
+            {dayCount(event) > 0 && <div className="small muted">Több napos esemény: {dayCount(event)} nap ({dayRange(event)})</div>}</div></div>
           <div className="row">
             <span className="ico">📍</span>
             <div style={{ flex: 1 }}>

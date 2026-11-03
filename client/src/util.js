@@ -38,6 +38,12 @@ export function dayRange(ev) {
     : `${f(ev.date, { month: 'short', day: 'numeric' })} – ${f(ev.endDate, { month: 'short', day: 'numeric' })}`;
 }
 
+// Több napos esemény napjainak száma (egynaposnál 0).
+export function dayCount(ev) {
+  if (!ev.endDate || ev.endDate <= ev.date) return 0;
+  return Math.round((new Date(`${ev.endDate}T12:00:00Z`) - new Date(`${ev.date}T12:00:00Z`)) / 86400000) + 1;
+}
+
 export function timeRange(ev) {
   if (!ev.startTime) return '';
   return ev.endTime ? `${ev.startTime}–${ev.endTime}` : ev.startTime;

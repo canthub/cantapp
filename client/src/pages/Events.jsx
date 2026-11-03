@@ -17,7 +17,7 @@ export function EventCard({ ev, showChoirs }) {
           {ev.isTour && <span className="badge tour">Turné</span>}
           {showChoirs && <span className="badge">{choirNames(ev.choirs)}</span>}
         </div>
-        <div className="meta">{[dayRange(ev), ev.endDate ? ev.startTime : timeRange(ev), place].filter(Boolean).join(' · ')}</div>
+        <div className="meta">{[dayRange(ev), timeRange(ev), place].filter(Boolean).join(' · ')}</div>
         <ResponsePill ev={ev} />
       </div>
     </div>
