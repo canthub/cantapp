@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EVENT_TYPES, RESPONSES } from '../../../shared/constants.js';
-import { dateParts, formatDateTimeIso, relativeDeadline } from '../util.js';
+import { dateParts, formatDateTimeIso, relativeDeadline, roomMissing } from '../util.js';
 
 export function Spinner() {
   return <div className="spinner" aria-label="Betöltés…" />;
@@ -46,6 +46,7 @@ export { RESPONSE_ICONS };
 export function ResponsePill({ ev }) {
   if (ev.status === 'cancelled') return <span className="pill no">Elmarad</span>;
   if (ev.invited === false) return <span className="pill none">Most nem vagy meghívva</span>;
+  if (ev.myResponse && ev.isOpen && roomMissing(ev)) return <span className="pill todo">🛏️ Jelöld, kérsz-e szállást!</span>;
   if (ev.myResponse) return <span className={`pill ${ev.myResponse}`}>{RESPONSE_ICONS[ev.myResponse]} {RESPONSES[ev.myResponse]}</span>;
   if (ev.isOpen) return <span className="pill todo">⏳ Jelezz vissza! ({relativeDeadline(ev.deadlineAt)})</span>;
   return <span className="pill none">Nem jeleztél vissza</span>;

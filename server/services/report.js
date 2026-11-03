@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { getEvent, eligibleMembers, responsesByMember, fullName, reportRecipients } from '../models.js';
 import { getDb } from '../db.js';
-import { CHOIRS, GUEST_LABEL, RESPONSE_REPORT_LABELS, EVENT_STATUSES, compareVoices } from '../../shared/constants.js';
+import { CHOIRS, GUEST_LABEL, RESPONSE_REPORT_LABELS, EVENT_STATUSES, compareVoices, accommodationChoice } from '../../shared/constants.js';
 import { formatIsoHu, eventWhenHu } from './time.js';
 import { sendMail, emailLayout, esc } from './mailer.js';
 
@@ -28,12 +28,16 @@ export function buildReport(eventId, now = new Date()) {
       respondedAt: r ? r.updated_at : null,
       setByAdmin: Boolean(r?.set_by_admin),
       accommodation: event.accommodation && Boolean(r?.accommodation),
+      // 'yes' | 'no' | null (részt vevőnél: még nem jelölte)
+      accommodationChoice: accommodationChoice(event, r),
     };
   });
   rows.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
     || compareVoices(a.voicePart, b.voicePart) || a.name.localeCompare(b.name, 'hu'));
 
-  const summary = { total: rows.length, yes: 0, maybe: 0, no: 0, none: 0, accommodation: rows.filter((r) => r.accommodation).length };
+  const summary = { total: rows.length, yes: 0, maybe: 0, no: 0, none: 0, accommodation: rows.filter((r) => r.accommodation).length,
+    // Részt vesz / talán, de még nem jelölte, kér-e szállást (pl. admin rögzítette a választ).
+    accommodationMissing: event.accommodation ? rows.filter((r) => (r.status === 'yes' || r.status === 'maybe') && !r.accommodationChoice).length : 0 };
   const byVoice = {};
   // A szólamonkénti összesítő a szokásos szólamsorrendben (S, A, T, B).
   for (const v of [...new Set(rows.map((r) => r.voicePart || 'Nincs megadva'))].sort(compareVoices)) byVoice[v] = { yes: 0, maybe: 0, no: 0, none: 0 };
@@ -68,7 +72,12 @@ const summaryLine = (report) => {
 const tableHeaders = (report) => ['Név', 'Szólam', 'Énekkar', 'E-mail', 'Telefon', 'Visszajelzés', 'Visszajelzés ideje',
   ...(report.event.accommodation ? ['Szállást kér'] : [])];
 const rowValues = (report) => (r) => [r.name, r.voicePart, r.choirs, r.email, r.phone, r.statusLabel + (r.setByAdmin ? ' (admin rögzítette)' : ''),
-  r.respondedAt ? formatIsoHu(r.respondedAt) : '', ...(report.event.accommodation ? [r.accommodation ? 'igen' : ''] : [])];
+  r.respondedAt ? formatIsoHu(r.respondedAt) : '', ...(report.event.accommodation ? [roomLabel(r)] : [])];
+
+const roomLabel = (r) => {
+  if (r.status !== 'yes' && r.status !== 'maybe') return '';
+  return { yes: 'igen', no: 'nem' }[r.accommodationChoice] || 'nincs megadva';
+};
 
 export async function reportXlsx(report) {
   const wb = new ExcelJS.Workbook();

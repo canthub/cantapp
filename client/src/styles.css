@@ -250,4 +250,6 @@ table.list td:first-child { min-width: 140px; }
 .voice-head { margin-bottom: 4px; }
 .voice-member { padding-left: 28px; margin-bottom: 6px; font-size: 15px; }
 
-.room-check { margin-top: 14px; padding: 12px 14px; border: 2px dashed var(--border); border-radius: 12px; font-weight: 600; }
+.room-choice { margin: 14px 0 0; padding: 10px 14px 4px; border: 2px dashed var(--border); border-radius: 12px; }
+.room-choice legend { font-weight: 600; padding: 0 6px; }
+.room-choice .req { color: var(--no); }

@@ -35,6 +35,15 @@ export const EVENT_STATUSES = {
 export const GUEST_LABEL = 'Kisegítő művész';
 export const GUESTS_LABEL = 'Kisegítő művészek';
 
+// Szálláskérés: kötelező választás, ha az eseménynél engedélyezett és a válasz „részt veszek” vagy „talán”.
+export const ACCOMMODATION_CHOICES = { yes: 'Igen, kérek szállást', no: 'Nem kérek szállást' };
+
+// A tag válaszának szállás-része: 'yes' | 'no' | null (még nem választott, vagy nem releváns).
+export function accommodationChoice(ev, response) {
+  if (!ev?.accommodation || !response || !['yes', 'maybe'].includes(response.status) || !response.accommodation_set) return null;
+  return response.accommodation ? 'yes' : 'no';
+}
+
 // Ha egy eseménynél nincs megadva visszajelzési határidő, ennyi nappal az esemény előtt lesz.
 export const DEFAULT_DEADLINE_DAYS = 14;
 

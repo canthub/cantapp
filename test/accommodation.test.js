@@ -9,7 +9,7 @@ import { buildReport, reportCsv } from '../server/services/report.js';
 import { changeMessage } from '../server/services/messages.js';
 import { buildMemberCalendar } from '../server/services/calendarFeed.js';
 import { importEventsTable, importIcs } from '../server/services/importers.js';
-import { accommodationAllowed } from '../shared/constants.js';
+import { accommodationAllowed, accommodationChoice } from '../shared/constants.js';
 
 const now = new Date('2027-01-10T10:00:00Z');
 let anna;
@@ -58,6 +58,12 @@ test('a tag a válaszával szállást kérhet; „nem” válasznál törlődik;
 
   await setResponse(id, anna, 'no', { accommodation: true, now });
   assert.equal(getResponse(id, anna).accommodation, 0, '„nem” mellett nem kérhet szállást');
+
+  // „Nem” után újra „részt veszek”: a szállásról ismét kötelező nyilatkozni.
+  await assert.rejects(setResponse(id, anna, 'yes', { now }), /Kérjük, jelöld, kérsz-e szállást/);
+  await setResponse(id, anna, 'yes', { accommodation: false, now });
+  assert.equal(accommodationChoice(getEvent(id), getResponse(id, anna)), 'no', '„nem kérek szállást” is rögzül');
+  assert.match(reportCsv(buildReport(id, now)), /Kovács Anna;.*;nem\r\n/);
 
   // Ha az eseményt egynaposra módosítják, a szálláskérés kikapcsol, és a riportból is eltűnik az oszlop.
   updateEvent(id, { ...getEvent(id), endDate: '' }, now);
@@ -111,4 +117,25 @@ test('több napos esemény időpontja: a kezdés és a befejezés az első napn�
   assert.equal(eventWhenHu({ date: '2026-11-30', endDate: '2026-12-01', startTime: '', endTime: '' }),
     '2026. november 30. (hétfő) · 2 napos esemény (november 30. – december 1.)');
   assert.equal(eventWhenHu({ date: '2026-12-05', endDate: '', startTime: '19:00', endTime: '' }), '2026. december 5. (szombat) 19:00');
+});
+
+test('szálláskérés kötelező választás: válasz nélkül nem menthető; admin rögzítésénél „nincs megadva”', async () => {
+  const id = createEvent({ ...tour, name: 'Szegedi fesztivál' });
+  setEventStatus(id, 'published', now);
+  const bea = saveMember({ lastName: 'Nagy', firstName: 'Bea', email: 'bea@x.hu', voicePart: 'Alt 2', choirs: ['promusica'] }).id;
+
+  await assert.rejects(setResponse(id, bea, 'maybe', { now }), /Kérjük, jelöld, kérsz-e szállást/);
+  assert.equal(getResponse(id, bea), null, 'a válasz sem mentődik el');
+  await setResponse(id, bea, 'no', { now });
+  assert.equal(getResponse(id, bea).status, 'no', '„nem tudok részt venni” mellé nem kell választani');
+
+  await setResponse(id, bea, 'yes', { byAdmin: true, now });
+  const report = buildReport(id, now);
+  assert.equal(report.summary.accommodationMissing, 1);
+  assert.match(reportCsv(report), /Nagy Bea;.*;nincs megadva\r\n/);
+
+  // Egy már meglévő választás válaszváltáskor megmarad, nem kell újra jelölni.
+  await setResponse(id, bea, 'yes', { accommodation: true, now });
+  await setResponse(id, bea, 'maybe', { now });
+  assert.equal(accommodationChoice(getEvent(id), getResponse(id, bea)), 'yes');
 });

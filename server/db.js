@@ -165,6 +165,9 @@ const MIGRATIONS = [
     member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
     PRIMARY KEY (event_id, member_id)
   );`,
+  // A szálláskérés kötelező választás („igen, kérek” / „nem kérek”): accommodation_set = válaszolt-e már.
+  `ALTER TABLE responses ADD COLUMN accommodation_set INTEGER NOT NULL DEFAULT 0;
+  UPDATE responses SET accommodation_set = 1 WHERE accommodation = 1;`,
 ];
 
 export function openDb(file) {

@@ -7,6 +7,7 @@ import {
 import { getMemberByEmail, getEventRow, getEvent, serializeEvent, isEligible, getResponse, listEvents } from '../models.js';
 import { setResponse, concertRuleAllows, concertRuleMessage } from '../services/rsvp.js';
 import { saveSubscription, removeSubscription } from '../services/push.js';
+import { accommodationChoice } from '../../shared/constants.js';
 import { sendMail, emailLayout, esc } from '../services/mailer.js';
 import {
   getCalendarToken, memberByCalendarToken, calendarUrls, buildMemberCalendar, calendarStatus, singleEventUrls, buildSingleEventCalendar,
@@ -67,7 +68,8 @@ function memberView(row, member, now = new Date()) {
   if (member.isGuest && ev.invited && row.status !== 'draft') ev.calendar = singleEventUrls(getCalendarToken(memberId), ev);
   const response = getResponse(row.id, memberId);
   ev.myResponse = response?.status || null;
-  ev.myAccommodation = Boolean(response?.accommodation);
+  // 'yes' | 'no' | null – null: még nem választott (kötelező, ha „részt veszek”/„talán” a válasza).
+  ev.myAccommodation = accommodationChoice(row, response);
   const canRespond = ev.isOpen && ev.invited;
   ev.allowed = { yes: canRespond, maybe: canRespond, no: canRespond };
   if (row.type === 'koncert' && row.dress_rehearsal_id) {

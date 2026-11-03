@@ -2,7 +2,7 @@ import { getDb, nowIso } from '../db.js';
 import {
   ValidationError, getEventRow, getEvent, getMember, isEligible, getResponse, isEventOpen,
 } from '../models.js';
-import { RESPONSES, article } from '../../shared/constants.js';
+import { RESPONSES, article, ACCOMMODATION_CHOICES } from '../../shared/constants.js';
 import { notifyMembers } from './notify.js';
 import { thanksMessage, concertResponseRemovedMessage, uninvitedMessage } from './messages.js';
 
@@ -21,7 +21,8 @@ export function concertRuleMessage(dr) {
 
 // Tagi visszajelzés (vagy admin rögzítése). Az admin a határidő után is módosíthat, és a főpróba-szabály rá nem vonatkozik.
 // accommodation: kér-e szállást (csak ha az eseménynél engedélyezett, és „részt veszek”/„talán” a válasz);
-// undefined = a korábbi érték marad (pl. ha az admin csak a választ módosítja).
+// undefined = a korábbi választás marad. A tagnak ilyenkor kötelező választania („igen, kérek” / „nem kérek”);
+// az admin rögzítésénél nem kötelező.
 export async function setResponse(eventId, memberId, status, { byAdmin = false, accommodation, now = new Date() } = {}) {
   const ev = getEventRow(eventId);
   if (!ev) throw Object.assign(new Error('Az esemény nem található.'), { status: 404 });
@@ -46,16 +47,28 @@ export async function setResponse(eventId, memberId, status, { byAdmin = false, 
 
   const db = getDb();
   const previous = getResponse(eventId, memberId);
-  const wantsRoom = Boolean(ev.accommodation) && (status === 'yes' || status === 'maybe')
-    && (accommodation === undefined ? Boolean(previous?.accommodation) : Boolean(accommodation));
+  const roomRelevant = Boolean(ev.accommodation) && (status === 'yes' || status === 'maybe');
+  // A korábbi választás csak akkor marad, ha az előző válasz is „részt veszek”/„talán” volt.
+  const keptChoice = previous?.accommodation_set && ['yes', 'maybe'].includes(previous.status);
+  let roomSet = false;
+  let wantsRoom = false;
+  if (roomRelevant && accommodation !== undefined && accommodation !== null) {
+    roomSet = true;
+    wantsRoom = Boolean(accommodation);
+  } else if (roomRelevant && keptChoice) {
+    roomSet = true;
+    wantsRoom = Boolean(previous.accommodation);
+  } else if (roomRelevant && !byAdmin) {
+    throw new ValidationError(`Kérjük, jelöld, kérsz-e szállást („${ACCOMMODATION_CHOICES.yes}” vagy „${ACCOMMODATION_CHOICES.no}”).`);
+  }
   if (status === null) {
     db.prepare('DELETE FROM responses WHERE event_id = ? AND member_id = ?').run(eventId, memberId);
   } else if (previous) {
-    db.prepare('UPDATE responses SET status = ?, accommodation = ?, set_by_admin = ?, updated_at = ? WHERE event_id = ? AND member_id = ?')
-      .run(status, wantsRoom ? 1 : 0, byAdmin ? 1 : 0, nowIso(now), eventId, memberId);
+    db.prepare('UPDATE responses SET status = ?, accommodation = ?, accommodation_set = ?, set_by_admin = ?, updated_at = ? WHERE event_id = ? AND member_id = ?')
+      .run(status, wantsRoom ? 1 : 0, roomSet ? 1 : 0, byAdmin ? 1 : 0, nowIso(now), eventId, memberId);
   } else {
-    db.prepare('INSERT INTO responses (event_id, member_id, status, accommodation, set_by_admin, responded_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(eventId, memberId, status, wantsRoom ? 1 : 0, byAdmin ? 1 : 0, nowIso(now), nowIso(now));
+    db.prepare('INSERT INTO responses (event_id, member_id, status, accommodation, accommodation_set, set_by_admin, responded_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(eventId, memberId, status, wantsRoom ? 1 : 0, roomSet ? 1 : 0, byAdmin ? 1 : 0, nowIso(now), nowIso(now));
   }
 
   const event = getEvent(eventId, now);

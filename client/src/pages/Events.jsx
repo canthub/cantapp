@@ -3,7 +3,7 @@ import { api } from '../api.js';
 import { navigate } from '../router.js';
 import { CHOIRS } from '../../../shared/constants.js';
 import { TopBar, Spinner, Empty, TypeBadge, DateBox, ResponsePill, useLoad } from '../components/ui.jsx';
-import { timeRange, dayRange, todayIso, choirNames } from '../util.js';
+import { timeRange, dayRange, todayIso, choirNames, roomMissing } from '../util.js';
 
 export function EventCard({ ev, showChoirs }) {
   const place = [ev.venue, ev.city].filter(Boolean).join(', ');
@@ -37,7 +37,8 @@ export default function Events({ me }) {
   else {
     const today = todayIso();
     let events = data.events.filter((e) => (choir === 'all' ? true : e.choirs.includes(choir)));
-    const todo = events.filter((e) => e.isOpen && e.invited && !e.myResponse);
+    // Visszajelzésre vár: nincs válasz, vagy szálláskérésnél még nincs kiválasztva, kér-e szállást.
+    const todo = events.filter((e) => e.isOpen && e.invited && (!e.myResponse || roomMissing(e)));
     if (tab === 'upcoming') events = events.filter((e) => e.date >= today);
     else if (tab === 'todo') events = todo;
     else events = events.filter((e) => e.date < today).reverse();

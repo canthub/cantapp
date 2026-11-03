@@ -117,7 +117,7 @@ export default function AdminEventDetail({ id }) {
             {dayCount(ev) > 0 && <div className="small muted">Több napos esemény: {dayCount(ev)} nap ({dayRange(ev)})</div>}</div></div>
           <div className="row"><span className="ico">📍</span><div>{placeText(ev) || '–'}{ev.mapsUrl && <> · <a href={ev.mapsUrl} target="_blank" rel="noreferrer">Térkép</a></>}</div></div>
           <div className="row"><span className="ico">⏰</span><div>Határidő: <Deadline ev={ev} /></div></div>
-          {ev.accommodation && <div className="row"><span className="ico">🛏️</span><div>Szálláskérés engedélyezve – <b>{summary.accommodation} tag kér szállást</b></div></div>}
+          {ev.accommodation && <div className="row"><span className="ico">🛏️</span><div>Szálláskérés engedélyezve – <b>{summary.accommodation} tag kér szállást</b>{summary.accommodationMissing > 0 && <span className="muted"> · {summary.accommodationMissing} résztvevő még nem jelölte</span>}</div></div>}
           <div className="row"><span className="ico">👥</span><div>Meghívottak: {ev.inviteMode === 'selected' ? <b>csak kijelölt tagok ({summary.total} fő)</b> : 'a kórus(ok) minden tagja'}</div></div>
           {ev.dressRehearsalId && <div className="row"><span className="ico">🎼</span><div>Kapcsolódó főpróba: <a href={`#/admin/esemeny/${ev.dressRehearsalId}`}>megnyitás</a></div></div>}
           {concerts.length > 0 && <div className="row"><span className="ico">🎤</span><div>Ehhez a főpróbához tartozó koncert: {concerts.map((c) => <a key={c.id} href={`#/admin/esemeny/${c.id}`} style={{ marginRight: 8 }}>{c.name}</a>)}</div></div>}
@@ -176,7 +176,7 @@ export default function AdminEventDetail({ id }) {
                       </select>
                       {r.setByAdmin && <div className="small muted">admin rögzítette</div>}
                     </td>
-                    {ev.accommodation && <td>{r.accommodation ? '🛏️ kér' : ''}</td>}
+                    {ev.accommodation && <td>{(r.status === 'yes' || r.status === 'maybe') && ({ yes: '🛏️ kér', no: 'nem kér' }[r.accommodationChoice] || <span className="muted">nincs megadva</span>)}</td>}
                     <td className="small">{r.respondedAt ? formatShortIso(r.respondedAt) : ''}</td>
                     <td className="small">{r.reminders ? `${r.reminders.count}× · ${formatShortIso(r.reminders.last)}` : '–'}</td>
                   </tr>
