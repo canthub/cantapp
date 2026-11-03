@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, toast } from '../api.js';
-import { RESPONSES, THANK_YOU_MESSAGE } from '../../../shared/constants.js';
+import { RESPONSES, THANK_YOU_MESSAGE, ACCOMMODATION_CHOICES } from '../../../shared/constants.js';
 import { TopBar, Spinner, TypeBadge, Deadline, RESPONSE_ICONS, useLoad } from '../components/ui.jsx';
 import { formatDate, timeRange, dayRange, dayCount, choirNames } from '../util.js';
 
@@ -8,14 +8,19 @@ export default function EventDetail({ id, onChange }) {
   const [data, error] = useLoad(() => api(`/events/${id}`), [id]);
   const [ev, setEv] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Szálláskérésnél a „részt veszek”/„talán” válasz csak a szállás-választással együtt menthető.
+  const [pending, setPending] = useState(null);
   const event = ev?.id === Number(id) ? ev : data?.event;
+  const needsRoom = (s) => Boolean(event?.accommodation) && (s === 'yes' || s === 'maybe');
 
   const respond = async (status, accommodation) => {
     setBusy(true);
     try {
       const res = await api(`/events/${id}/response`, { method: 'PUT', body: { status, accommodation } });
       setEv(res.event);
-      if (accommodation !== undefined) toast(accommodation ? 'Szálláskérésedet rögzítettük. 🛏️' : 'Szálláskérésedet töröltük.');
+      const roomOnly = accommodation !== undefined && !pending && status === event.myResponse;
+      setPending(null);
+      if (roomOnly) toast(accommodation ? 'Rögzítettük: szállást kérsz. 🛏️' : 'Rögzítettük: nem kérsz szállást.');
       else toast(res.first ? THANK_YOU_MESSAGE : 'Visszajelzésedet módosítottuk.');
       if (res.removedConcerts?.length) toast('A kapcsolódó koncertre adott visszajelzésedet töröltük, mert a főpróbára nem jelöltél részvételt.', 'err');
       onChange?.();
@@ -78,18 +83,40 @@ export default function EventDetail({ id, onChange }) {
             {event.isOpen && event.ruleMessage && !event.allowed.yes && <div className="notice warn">{event.ruleMessage}</div>}
             <div className="rsvp">
               {['yes', 'maybe', 'no'].map((s) => (
-                <button key={s} className={`${s} ${event.myResponse === s ? 'sel' : ''}`} disabled={busy || !event.allowed[s]} onClick={() => respond(s)}>
-                  <span className="ico">{RESPONSE_ICONS[s]}</span>{RESPONSES[s]}{event.myResponse === s && <span style={{ marginLeft: 'auto' }}>✓</span>}
+                <button
+                  key={s}
+                  className={`${s} ${(pending || event.myResponse) === s ? 'sel' : ''}`}
+                  disabled={busy || !event.allowed[s]}
+                  onClick={() => {
+                    // Ha még nincs szállás-választás, előbb azt kérjük (a válasz csak vele együtt menthető).
+                    if (needsRoom(s) && event.myAccommodation === null) setPending(s);
+                    else { setPending(null); respond(s); }
+                  }}
+                >
+                  <span className="ico">{RESPONSE_ICONS[s]}</span>{RESPONSES[s]}{(pending || event.myResponse) === s && <span style={{ marginLeft: 'auto' }}>{pending === s ? '…' : '✓'}</span>}
                 </button>
               ))}
             </div>
-            {event.accommodation && (event.myResponse === 'yes' || event.myResponse === 'maybe') && (
-              <label className="check room-check">
-                <input type="checkbox" checked={event.myAccommodation} disabled={busy || !event.isOpen} onChange={(e) => respond(event.myResponse, e.target.checked)} />
-                🛏️ Kérek szállást
-              </label>
+            {needsRoom(pending || event.myResponse) && (
+              <fieldset className="room-choice">
+                <legend>🛏️ Kérsz szállást? <span className="req">*</span></legend>
+                {pending && <p className="notice warn" style={{ margin: '0 0 8px' }}>A visszajelzésed mentéséhez válaszd ki, kérsz-e szállást.</p>}
+                {!pending && event.myAccommodation === null && event.isOpen && <p className="notice warn" style={{ margin: '0 0 8px' }}>Még nem jelölted, kérsz-e szállást – kérjük, válassz!</p>}
+                {Object.entries(ACCOMMODATION_CHOICES).map(([k, label]) => (
+                  <label key={k} className="check">
+                    <input
+                      type="radio"
+                      name="accommodation"
+                      checked={!pending && event.myAccommodation === k}
+                      disabled={busy || !event.isOpen}
+                      onChange={() => respond(pending || event.myResponse, k === 'yes')}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
             )}
-            {event.accommodation && !event.myResponse && event.isOpen && <p className="hint" style={{ marginTop: 10 }}>🛏️ Erre az eseményre szállást is kérhetsz – jelölj „Részt veszek” vagy „Talán” választ, és megjelenik a lehetőség.</p>}
+            {event.accommodation && !event.myResponse && !pending && event.isOpen && <p className="hint" style={{ marginTop: 10 }}>🛏️ Erre az eseményre szállást is kérhetsz – jelölj „Részt veszek” vagy „Talán” választ, és utána válaszd ki, kérsz-e szállást.</p>}
             {!event.isOpen && !event.myResponse && <p className="muted small" style={{ marginTop: 12 }}>Erre az eseményre nem jeleztél vissza.</p>}
           </div>
         )}

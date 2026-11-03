@@ -38,6 +38,11 @@ export function dayRange(ev) {
     : `${f(ev.date, { month: 'short', day: 'numeric' })} – ${f(ev.endDate, { month: 'short', day: 'numeric' })}`;
 }
 
+// Szálláskérésnél a „részt veszek”/„talán” válasz mellé kötelező kiválasztani, kér-e szállást.
+export function roomMissing(ev) {
+  return Boolean(ev.accommodation) && (ev.myResponse === 'yes' || ev.myResponse === 'maybe') && ev.myAccommodation == null;
+}
+
 // Több napos esemény napjainak száma (egynaposnál 0).
 export function dayCount(ev) {
   if (!ev.endDate || ev.endDate <= ev.date) return 0;
