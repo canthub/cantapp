@@ -24,7 +24,8 @@ function details(ev) {
   if (ev.notes) rows.push(['Megjegyzés', ev.notes]);
   const tr = rows.map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#8a817a;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>`).join('');
   const map = ev.mapsUrl ? `<p style="margin:12px 0 0"><a href="${esc(ev.mapsUrl)}" style="color:#7a1f2b">📍 Megnyitás a Google Térképen</a></p>` : '';
-  return `<table role="presentation" style="border-collapse:collapse;font-size:14px;margin-top:8px">${tr}</table>${map}`;
+  const scores = ev.scoresUrl ? `<p style="margin:8px 0 0"><a href="${esc(ev.scoresUrl)}" style="color:#7a1f2b">🎼 A tanult művek kottái</a></p>` : '';
+  return `<table role="presentation" style="border-collapse:collapse;font-size:14px;margin-top:8px">${tr}</table>${map}${scores}`;
 }
 
 export function announceMessage(ev) {

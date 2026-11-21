@@ -9,7 +9,7 @@ import { formatDate, todayIso } from '../../util.js';
 const EMPTY = {
   name: '', type: 'proba', date: '', startTime: '', endTime: '', country: 'Magyarország', city: '', address: '', venue: '',
   isTour: false, deadlineDate: '', deadlineTime: '23:59', dressRehearsalId: '', notes: '', choirs: [], inviteMode: 'all', invitees: [], guests: [],
-  endDate: '', accommodation: false,
+  endDate: '', accommodation: false, scoresUrl: '',
 };
 
 function minusDays(date, n) {
@@ -44,7 +44,7 @@ export default function AdminEventForm({ id }) {
           address: e.address, venue: e.venue, isTour: e.isTour, deadlineDate: e.deadlineDate, deadlineTime: e.deadlineTime,
           dressRehearsalId: e.dressRehearsalId || '', notes: e.notes, choirs: e.choirs,
           inviteMode: e.inviteMode, invitees: e.invitees || [], guests: e.guests || [],
-          endDate: e.endDate || '', accommodation: e.accommodation,
+          endDate: e.endDate || '', accommodation: e.accommodation, scoresUrl: e.scoresUrl || '',
         };
         setInvitedBefore(rows.map((r) => r.memberId));
         setForm(f);
@@ -243,6 +243,10 @@ export default function AdminEventForm({ id }) {
             </label>
           )}
 
+          <label className="field"><span>🎼 Kották linkje (a tanult művek kottái)</span>
+            <input type="text" inputMode="url" autoCapitalize="off" value={form.scoresUrl} onChange={set('scoresUrl')} placeholder="pl. https://drive.google.com/drive/folders/…" />
+            <span className="hint">Nem kötelező. Pl. egy Google Drive vagy Dropbox mappa linkje – a tagok az eseménynél egy gombbal megnyithatják. Ellenőrizd, hogy a link megosztása „bárki, akinél a link van” legyen!</span>
+          </label>
           <label className="field"><span>Megjegyzés (a tagok is látják)</span><textarea value={form.notes} onChange={set('notes')} placeholder="pl. fellépő ruha, gyülekező időpontja" /></label>
 
           {!isNew && isPublished && importantChanged && (

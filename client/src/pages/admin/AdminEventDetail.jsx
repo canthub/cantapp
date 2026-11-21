@@ -117,6 +117,7 @@ export default function AdminEventDetail({ id }) {
             {dayCount(ev) > 0 && <div className="small muted">Több napos esemény: {dayCount(ev)} nap ({dayRange(ev)})</div>}</div></div>
           <div className="row"><span className="ico">📍</span><div>{placeText(ev) || '–'}{ev.mapsUrl && <> · <a href={ev.mapsUrl} target="_blank" rel="noreferrer">Térkép</a></>}</div></div>
           <div className="row"><span className="ico">⏰</span><div>Határidő: <Deadline ev={ev} /></div></div>
+          {ev.scoresUrl && <div className="row"><span className="ico">🎼</span><div><a href={ev.scoresUrl} target="_blank" rel="noreferrer">Kották megnyitása</a></div></div>}
           {ev.accommodation && <div className="row"><span className="ico">🛏️</span><div>Szálláskérés engedélyezve – <b>{summary.accommodation} tag kér szállást</b>{summary.accommodationMissing > 0 && <span className="muted"> · {summary.accommodationMissing} résztvevő még nem jelölte</span>}</div></div>}
           <div className="row"><span className="ico">👥</span><div>Meghívottak: {ev.inviteMode === 'selected' ? <b>csak kijelölt tagok ({summary.total} fő)</b> : 'a kórus(ok) minden tagja'}</div></div>
           {ev.dressRehearsalId && <div className="row"><span className="ico">🎼</span><div>Kapcsolódó főpróba: <a href={`#/admin/esemeny/${ev.dressRehearsalId}`}>megnyitás</a></div></div>}

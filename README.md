@@ -18,6 +18,8 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 - **Szálláskérés:** a Nyíregyházán kívüli, több napos eseményeknél (amelyeknél ki van töltve az *Utolsó nap*) az admin engedélyezheti, hogy a tagok szállást kérjenek. Ilyenkor ez alapból be is van kapcsolva. A tag a „Részt veszek” vagy a „Talán” válasz mellé **kötelezően** választ: *„Igen, kérek szállást”* vagy *„Nem kérek szállást”* (rádiógombok) – a válasz csak ezzel együtt menthető. Az admin követő nézetében, a riportban és az exportban látszik, ki kér szállást, ki nem, és ki nem jelölte még (pl. ha az admin rögzítette a választ). Akinél hiányzik a választás, annál az esemény a „Visszajelzésre vár” fülön marad.
 - **Saját naptár-feliratkozás** (*Profil → Események a saját naptáradban*): személyes, titkos naptárlink iPhone/Mac, Google és Outlook naptárhoz. Minden esemény megjelenik benne, amelyre a tag meg van hívva, a válasz jelével a címben: ✅ részt veszek, ❓ talán, ❌ nem, ⏳ még nem jelzett vissza. A módosítások és a lemondások is frissülnek, a naptár saját frissítési ütemében (óránként–naponta). A link a Profil oldalon újragenerálható, ekkor a régi megszűnik.
 
+- **Kották linkje:** az eseményhez megadható egy link a tanult művek kottáihoz (pl. Google Drive vagy Dropbox mappa). A tagok az esemény oldalán a *„🎼 Kották megnyitása”* gombbal érik el; a link az értesítő e-mailekben és a naptárbejegyzés leírásában is szerepel. A táblázatos importban a *Kották linkje* oszlop tartozik hozzá.
+
 **Meghívottak eseményenként**
 - Alapértelmezésben a kiválasztott kórus(ok) minden tagja meg van hívva. Az eseménynél választható a *„Csak a kijelölt tagok”* lehetőség is: ilyenkor a tagok **szólamonként csoportosítva** jelennek meg (Szoprán → Alt → Tenor → Basszus, egész szólam egy kattintással kijelölhető), és a meghívotti lista másik eseményről (pl. a főpróbáról) át is másolható.
 - Az eseményt a kórus minden tagja látja, de értesítést, emlékeztetőt csak a meghívottak kapnak, és csak ők jelezhetnek vissza. A riportban is csak ők szerepelnek.
@@ -56,7 +58,7 @@ Az app egy **telepíthető webalkalmazás (PWA)**: a telefon böngészőjében m
 
 A `templates/` mappában (és az admin felületen letölthetően):
 - `tagok_import_sablon.xlsx` / `.csv`. Oszlopok: Vezetéknév, Keresztnév, E-mail, Telefon, Szólam, Irányítószám, Lakóhely (település), Cantemus Vegyeskar (igen/nem), Pro Musica (igen/nem), Kisegítő művész (igen/nem), Admin (igen/nem).
-- `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Utolsó nap, Kezdés, Befejezés, Típus, Van főpróbája, Énekkar, Turné, Szálláskérés, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés.
+- `esemenyek_import_sablon.xlsx` / `.csv`. Oszlopok: Esemény neve, Dátum, Utolsó nap, Kezdés, Befejezés, Típus, Van főpróbája, Énekkar, Turné, Szálláskérés, Ország, Város, Cím, Épület, Visszajelzési határidő, Megjegyzés, Kották linkje.
 
 Az Excel-sablonok második munkalapján kitöltési útmutató található.
 

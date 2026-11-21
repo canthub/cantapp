@@ -245,6 +245,7 @@ export async function importEventsTable(buffer, filename, { defaultChoirs = [], 
           isTour: parseBool(pick(row, 'Turné', 'Koncertturné')),
           deadlineDate: deadlineCell ? parseDate(deadlineCell) : (date ? defaultDeadlineDate(parseDate(date), deadlineDaysBefore) : ''),
           notes: pick(row, 'Megjegyzés', 'Leírás'),
+          scoresUrl: pick(row, 'Kották linkje', 'Kották', 'Kotta', 'Kotta link'),
           choirs,
           // Üresen hagyva: ha lehetséges (Nyíregyházán kívüli, több napos esemény), engedélyezett.
           accommodation: pick(row, 'Szálláskérés', 'Szállás') ? parseBool(pick(row, 'Szálláskérés', 'Szállás')) : true,

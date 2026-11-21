@@ -123,6 +123,7 @@ function eventDescription(ev, answer) {
     answer ? `Visszajelzésed: ${answer.status === 'none' ? 'még nincs' : RESPONSES[answer.status]}${ev.accommodation && answer.response?.accommodation ? ' (szállást kértél)' : ''}` : null,
     ev.isOpen ? `Visszajelzési határidő: ${formatIsoHu(ev.deadlineAt)}` : null,
     ev.notes ? `\n${ev.notes}` : null,
+    ev.scoresUrl ? `\nKották: ${ev.scoresUrl}` : null,
     `\nVisszajelzés és részletek az appban: ${eventLink(ev)}`,
   ].filter(Boolean).join('\n');
 }
