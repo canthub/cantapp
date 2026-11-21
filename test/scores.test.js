@@ -41,3 +41,35 @@ test('táblázat import: „Kották linkje” oszlop', async () => {
   assert.equal(getEvent(r.ids[0]).scoresUrl, 'https://drive.google.com/x');
   assert.match(r.errors[0], /3\. sor: Érvénytelen link/);
 });
+
+test('kották linkjének megadása közzétett eseménynél: a meghívottak értesítést kapnak', async () => {
+  const { createSession, SESSION_COOKIE } = await import('../server/auth.js');
+  const { getDb } = await import('../server/db.js');
+  const { createApp } = await import('../server/app.js');
+  const admin = saveMember({ lastName: 'Admin', firstName: 'Ádám', email: 'admin@x.hu', choirs: ['cantemus'], isAdmin: true }).id;
+  const server = createApp().listen(0);
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/api/admin`;
+    const put = (id, body) => fetch(`${url}/events/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'cantapp', Cookie: `${SESSION_COOKIE}=${createSession(admin).token}` },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+    const future = new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10);
+    const id = createEvent({ ...base, name: 'Tavaszi próba', date: future, deadlineDate: future });
+    setEventStatus(id, 'published');
+    const scoresOf = () => getDb().prepare(`SELECT member_id FROM notifications WHERE event_id = ? AND kind = 'scores'`).all(id).map((r) => r.member_id);
+
+    const first = await put(id, { ...getEvent(id), scoresUrl: 'drive.google.com/tavasz' });
+    assert.equal(first.scoresNotified, 2, 'mindkét meghívott értesítést kap');
+    assert.deepEqual(scoresOf().sort(), [anna, admin].sort());
+    const n = getDb().prepare(`SELECT title, body FROM notifications WHERE event_id = ? AND kind = 'scores' LIMIT 1`).get(id);
+    assert.equal(n.title, 'Kották: Tavaszi próba');
+
+    assert.equal((await put(id, { ...getEvent(id), notes: 'más módosítás' })).scoresNotified, 0, 'változatlan linknél nincs értesítés');
+    assert.equal((await put(id, { ...getEvent(id), scoresUrl: 'drive.google.com/uj', notifyScores: false })).scoresNotified, 0, 'kikapcsolható');
+    assert.equal((await put(id, { ...getEvent(id), scoresUrl: '' })).scoresNotified, 0, 'törléskor nincs értesítés');
+  } finally {
+    server.close();
+  }
+});

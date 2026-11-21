@@ -351,7 +351,7 @@ export function createEvent(input, { source = 'manual', externalUid = null, exte
 }
 
 // Visszaadja, hogy változott-e lényeges adat (dátum, idő, helyszín) – erről értesítést lehet küldeni –,
-// valamint hogy kik kerültek ki a meghívottak közül, illetve kik kerültek be.
+// hogy új vagy módosult-e a kották linkje, valamint hogy kik kerültek ki a meghívottak közül, illetve kik kerültek be.
 export function updateEvent(id, input, now = new Date()) {
   const before = getEventRow(id);
   if (!before) throw Object.assign(new Error('Az esemény nem található.'), { status: 404 });
@@ -380,6 +380,7 @@ export function updateEvent(id, input, now = new Date()) {
   const invitedAfter = new Set(eligibleMembers(id).map((m) => m.id));
   return {
     importantChange: keyFields.some((k) => before[k] !== cols[k]),
+    scoresChanged: Boolean(cols.scores_url) && before.scores_url !== cols.scores_url,
     removed: [...invitedBefore].filter((m) => !invitedAfter.has(m)),
     added: [...invitedAfter].filter((m) => !invitedBefore.has(m)),
   };

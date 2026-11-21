@@ -68,6 +68,17 @@ export function changeMessage(ev) {
   };
 }
 
+// Új vagy módosult kották linkje egy (már közzétett) eseménynél.
+export function scoresMessage(ev) {
+  return {
+    kind: 'scores',
+    title: `Kották: ${ev.name}`,
+    body: `Elérhetők ${article(ev.name)} ${ev.name} esemény (${when(ev)}) kottái. Az esemény oldalán a „Kották megnyitása” gombbal nyithatod meg.`,
+    url: eventUrl(ev),
+    emailHtml: details(ev),
+  };
+}
+
 export function cancelMessage(ev) {
   return {
     kind: 'cancel',

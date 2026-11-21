@@ -29,6 +29,7 @@ export default function AdminEventForm({ id }) {
   const [geo, setGeo] = useState(null);
   const [roomTouched, setRoomTouched] = useState(!isNew);
   const [notifyChange, setNotifyChange] = useState(true);
+  const [notifyScores, setNotifyScores] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [deadlineTouched, setDeadlineTouched] = useState(!isNew);
@@ -130,11 +131,12 @@ export default function AdminEventForm({ id }) {
         toast(publish ? 'Esemény közzétéve, az értesítések kimentek.' : 'Esemény elmentve piszkozatként.');
         navigate(`/admin/esemeny/${res.event.id}`);
       } else {
-        const res = await api(`/admin/events/${id}`, { method: 'PUT', body: { ...body, notifyChange } });
+        const res = await api(`/admin/events/${id}`, { method: 'PUT', body: { ...body, notifyChange, notifyScores } });
         const parts = ['Mentve.'];
         if (res.notified) parts.push(`${res.notified} tag kapott értesítést a változásról.`);
         if (res.uninvited) parts.push(`${res.uninvited} tag kikerült a meghívottak közül (üzenetet kaptak).`);
         if (res.announced) parts.push(`${res.announced} új meghívott kapott értesítést.`);
+        if (res.scoresNotified) parts.push(`${res.scoresNotified} tag kapott értesítést a kottákról.`);
         toast(parts.join(' '));
         navigate(`/admin/esemeny/${id}`);
       }
@@ -249,6 +251,9 @@ export default function AdminEventForm({ id }) {
           </label>
           <label className="field"><span>Megjegyzés (a tagok is látják)</span><textarea value={form.notes} onChange={set('notes')} placeholder="pl. fellépő ruha, gyülekező időpontja" /></label>
 
+          {!isNew && isPublished && (original.endDate || original.date) >= todayIso() && form.scoresUrl.trim() && form.scoresUrl.trim() !== (original.scoresUrl || '') && (
+            <label className="check"><input type="checkbox" checked={notifyScores} onChange={(e) => setNotifyScores(e.target.checked)} />🎼 Értesítés küldése a meghívottaknak a kották linkjéről</label>
+          )}
           {!isNew && isPublished && importantChanged && (
             <label className="check"><input type="checkbox" checked={notifyChange} onChange={(e) => setNotifyChange(e.target.checked)} />Értesítés küldése a tagoknak a változásról</label>
           )}
