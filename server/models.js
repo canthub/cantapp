@@ -165,6 +165,7 @@ export function serializeEvent(row, now = new Date()) {
     deadlineTime: localTimeOf(row.deadline_at),
     dressRehearsalId: row.dress_rehearsal_id,
     notes: row.notes,
+    scoresUrl: row.scores_url,
     status: row.status,
     publishedAt: row.published_at,
     closedAt: row.closed_at,
@@ -196,6 +197,23 @@ export function listEvents({ statuses = null, choirs = null } = {}, now) {
   return events;
 }
 
+// Link (pl. a kották mappája): séma nélkül https:// elé kerül; csak http(s) link fogadható el.
+export function normalizeUrl(value) {
+  let s = str(value);
+  if (!s) return '';
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) s = `https://${s.replace(/^\/+/, '')}`;
+  let url;
+  try {
+    url = new URL(s);
+  } catch {
+    url = null;
+  }
+  if (!url || !['http:', 'https:'].includes(url.protocol) || !url.hostname.includes('.')) {
+    throw new ValidationError(`Érvénytelen link: „${str(value)}” (pl. https://drive.google.com/…).`);
+  }
+  return url.href;
+}
+
 export function normalizeEventInput(input) {
   const e = {
     name: str(input.name),
@@ -213,6 +231,7 @@ export function normalizeEventInput(input) {
     deadlineTime: str(input.deadlineTime) || '23:59',
     dressRehearsalId: input.dressRehearsalId ? Number(input.dressRehearsalId) : null,
     notes: str(input.notes),
+    scoresUrl: normalizeUrl(input.scoresUrl),
     choirs: [...new Set((input.choirs || []).filter((c) => c in CHOIRS))],
     inviteMode: input.inviteMode === 'selected' ? 'selected' : 'all',
     // null = a meglévő meghívotti lista változatlan marad (pl. naptárszinkronnál)
@@ -282,6 +301,7 @@ function eventColumns(e) {
     deadline_at: deadlineToUtcIso(e.deadlineDate, e.deadlineTime),
     dress_rehearsal_id: e.dressRehearsalId,
     notes: e.notes,
+    scores_url: e.scoresUrl,
     invite_mode: e.inviteMode,
   };
 }
@@ -331,7 +351,7 @@ export function createEvent(input, { source = 'manual', externalUid = null, exte
 }
 
 // Visszaadja, hogy változott-e lényeges adat (dátum, idő, helyszín) – erről értesítést lehet küldeni –,
-// valamint hogy kik kerültek ki a meghívottak közül, illetve kik kerültek be.
+// hogy új vagy módosult-e a kották linkje, valamint hogy kik kerültek ki a meghívottak közül, illetve kik kerültek be.
 export function updateEvent(id, input, now = new Date()) {
   const before = getEventRow(id);
   if (!before) throw Object.assign(new Error('Az esemény nem található.'), { status: 404 });
@@ -360,6 +380,7 @@ export function updateEvent(id, input, now = new Date()) {
   const invitedAfter = new Set(eligibleMembers(id).map((m) => m.id));
   return {
     importantChange: keyFields.some((k) => before[k] !== cols[k]),
+    scoresChanged: Boolean(cols.scores_url) && before.scores_url !== cols.scores_url,
     removed: [...invitedBefore].filter((m) => !invitedAfter.has(m)),
     added: [...invitedAfter].filter((m) => !invitedBefore.has(m)),
   };

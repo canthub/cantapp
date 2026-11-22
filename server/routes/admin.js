@@ -11,10 +11,10 @@ import {
   reportRecipients, setSetting, ValidationError, suggestDressRehearsal, normalizeEventInput, getInvitees, getEventGuests, assertPublishable, deadlinePassed,
 } from '../models.js';
 import { config } from '../config.js';
-import { deadlineToUtcIso } from '../services/time.js';
+import { deadlineToUtcIso, localDateOf } from '../services/time.js';
 import { setResponse, withdrawInvitations } from '../services/rsvp.js';
 import { notifyMembers, logReminder } from '../services/notify.js';
-import { reminderMessage, generalReminderMessage, changeMessage, cancelMessage } from '../services/messages.js';
+import { reminderMessage, generalReminderMessage, changeMessage, cancelMessage, scoresMessage } from '../services/messages.js';
 import { sendAnnouncements } from '../services/scheduler.js';
 import { buildReport, reportXlsx, reportCsv, reportPrintPage, emailReport, fileBase } from '../services/report.js';
 import { importMembers, importEventsTable, importIcs, fetchIcs } from '../services/importers.js';
@@ -76,7 +76,7 @@ adminRouter.get('/events/:id', (req, res) => {
 
 adminRouter.put('/events/:id', async (req, res) => {
   const id = eventId(req);
-  const { importantChange, removed, added } = updateEvent(id, req.body);
+  const { importantChange, scoresChanged, removed, added } = updateEvent(id, req.body);
   const ev = getEvent(id);
   let notified = 0;
   // Akit kivettek a meghívottak közül: üzenetet kap, a válasza törlődik.
@@ -87,7 +87,15 @@ adminRouter.put('/events/:id', async (req, res) => {
     const targets = eligibleMembers(id).map((m) => m.id).filter((m) => !added.includes(m));
     notified = await notifyMembers(targets, { ...changeMessage(ev), eventId: id });
   }
-  res.json({ event: ev, importantChange, notified, uninvited, announced });
+  // Új vagy lecserélt kották linkje: a meghívottak értesítést kapnak, amíg az esemény még nem volt meg
+  // (az új meghívottaknál a link már benne van az „Új esemény” levélben).
+  let scoresNotified = 0;
+  const upcoming = (ev.endDate || ev.date) >= localDateOf(new Date().toISOString());
+  if (scoresChanged && req.body.notifyScores !== false && ev.status === 'published' && upcoming) {
+    const targets = eligibleMembers(id).map((m) => m.id).filter((m) => !added.includes(m));
+    scoresNotified = await notifyMembers(targets, { ...scoresMessage(ev), eventId: id });
+  }
+  res.json({ event: ev, importantChange, notified, uninvited, announced, scoresNotified });
 });
 
 adminRouter.delete('/events/:id', (req, res) => {

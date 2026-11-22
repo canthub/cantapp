@@ -168,6 +168,8 @@ const MIGRATIONS = [
   // A szálláskérés kötelező választás („igen, kérek” / „nem kérek”): accommodation_set = válaszolt-e már.
   `ALTER TABLE responses ADD COLUMN accommodation_set INTEGER NOT NULL DEFAULT 0;
   UPDATE responses SET accommodation_set = 1 WHERE accommodation = 1;`,
+  // Link a tanult művek kottáihoz (pl. Google Drive mappa).
+  `ALTER TABLE events ADD COLUMN scores_url TEXT NOT NULL DEFAULT '';`,
 ];
 
 export function openDb(file) {

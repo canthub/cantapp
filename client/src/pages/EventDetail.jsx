@@ -61,6 +61,15 @@ export default function EventDetail({ id, onChange }) {
             </div>
           </div>
           <div className="row"><span className="ico">⏰</span><div><div className="lbl">Visszajelzési határidő</div><Deadline ev={event} /></div></div>
+          {event.scoresUrl && (
+            <div className="row">
+              <span className="ico">🎼</span>
+              <div style={{ flex: 1 }}>
+                <div className="lbl">Kották</div>
+                <a className="btn small" href={event.scoresUrl} target="_blank" rel="noreferrer">🎼 Kották megnyitása</a>
+              </div>
+            </div>
+          )}
           {event.notes && <div className="row"><span className="ico">📝</span><div><div className="lbl">Megjegyzés</div><div style={{ whiteSpace: 'pre-wrap' }}>{event.notes}</div></div></div>}
         </div>
 
